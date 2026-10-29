@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LeTour Analytics – Stages</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Barlow+Condensed:wght@600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F4F6;color:#15171C;font-family:'Barlow',system-ui,sans-serif}
+a{color:#15171C}a:hover{color:#000}
+.num{font-variant-numeric:tabular-nums}
+.nav a{display:flex;align-items:center;padding:10px 12px;border-radius:8px;color:#C9CCD3;text-decoration:none;font-weight:500;font-size:15px;min-height:44px;box-sizing:border-box}
+.nav a:hover{background:#262A33;color:#fff}
+.nav a.on{background:#F5C400;color:#15171C;font-weight:700}
+.card{background:#fff;border:1px solid #E3E5EA;border-radius:12px;padding:20px;box-sizing:border-box;min-width:0}
+.lbl{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5B6170}
+.h2{margin:0;font-size:18px;font-weight:700}
+.tag{font-size:12px;font-weight:600;color:#5B6170;background:#F3F4F6;border-radius:999px;padding:3px 9px}
+.chip{font:600 13px 'Barlow',sans-serif;height:40px;padding:0 14px;border-radius:999px;border:1px solid #D5D8DE;background:#fff;color:#15171C;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.chip.on{background:#15171C;color:#fff;border-color:#15171C}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5B6170;text-align:left;padding:8px 10px;border-bottom:1px solid #E3E5EA;white-space:nowrap}
+.tbl td{padding:9px 10px;border-bottom:1px solid #F0F1F4;white-space:nowrap}
+.tbl td.r,.tbl th.r{text-align:right}
+.stg{font:700 15px 'Barlow',sans-serif;height:48px;border-radius:8px;border:2px solid transparent;cursor:pointer;color:#15171C}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 100vh">
+  <nav aria-label="Dashboard sections" style="flex: 1 1 220px; max-width: 260px; background: #15171C; color: #C9CCD3; padding: 28px 18px; box-sizing: border-box; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; flex-direction: column; gap: 6px; padding: 0 6px">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <svg aria-hidden="true" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#F5C400" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16" r="3.5"></circle><circle cx="18.5" cy="16" r="3.5"></circle><path d="M5.5 16l4-7h6l3 7M9.5 9l3 7 3-7M8 6.5h3"></path></svg>
+        <span style="font-family: 'Barlow Condensed'; font-weight: 700; font-size: 23px; color: #fff; letter-spacing: .02em">LeTour Analytics</span>
+      </div>
+      <span style="font-size: 13px; color: #9AA0AC">BT5110 · Group 16 · Tour 2025</span>
+    </div>
+    <div class="nav" style="display: flex; flex-direction: column; gap: 2px">
+      <a href="Main.dc.html">Overview</a>
+      <a href="Classifications.dc.html">GC &amp; Classifications</a>
+      <a href="Stages.dc.html" class="on" aria-current="page">Stages</a>
+      <a href="Riders.dc.html">Riders</a>
+      <a href="Teams.dc.html">Teams</a>
+      <a href="Nations.dc.html">Nations</a>
+    </div>
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 0 6px; font-size: 13px; color: #9AA0AC">
+      <span class="lbl" style="color: #9AA0AC">Stage types</span>
+      <span style="display: flex; align-items: center; gap: 8px"><i class="dot" style="background: #8FB3D9"></i>Flat</span>
+      <span style="display: flex; align-items: center; gap: 8px"><i class="dot" style="background: #E59A3C"></i>Hilly</span>
+      <span style="display: flex; align-items: center; gap: 8px"><i class="dot" style="background: #B5644A"></i>Mountain</span>
+      <span style="display: flex; align-items: center; gap: 8px"><i class="dot" style="background: #8D7FE0"></i>Individual time-trial</span>
+      <span style="border-top: 1px solid #2C3039; padding-top: 12px; margin-top: 6px">Source: PostgreSQL · LeTour</span>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; max-width: 1240px">
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span class="lbl">Overview › Stages › Stage 12</span>
+        <h1 style="margin: 0; font-family: 'Barlow Condensed'; font-weight: 700; font-size: 40px; line-height: 1.05">Stage in focus</h1>
+      </div>
+      <span class="tag" style="background: #FFF6CC; color: #6B5300">Illustrative values · wired to SQL views in build</span>
+    </header>
+
+    <section class="card" aria-label="Choose a stage" style="display: flex; flex-direction: column; gap: 10px; padding: 16px 20px">
+      <span class="lbl">Choose a stage</span>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px">
+        <sc-for list="{{stages}}" as="s" hint-placeholder-count="21">
+          <button class="stg num" aria-pressed="{{s.sel}}" aria-label="{{s.title}}" style="background: {{s.bg}}; color: {{s.fg}}; border-color: {{s.bd}}">{{s.n}}</button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-label="Stage summary" style="display: flex; flex-wrap: wrap; gap: 0; border-radius: 12px; overflow: hidden; background: #15171C; color: #fff">
+      <div style="flex: 2 1 360px; padding: 24px 28px; display: flex; flex-direction: column; gap: 8px">
+        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #F0C9BC"><i class="dot" style="background: #B5644A"></i>MOUNTAIN · THU 17 JULY 2025</span>
+        <span style="font-family: 'Barlow Condensed'; font-weight: 700; font-size: 44px; line-height: 1">Stage 12 · Auch → Hautacam</span>
+        <span style="font-size: 14px; color: #C9CCD3">Start FRA · Finish FRA</span>
+      </div>
+      <div class="num" style="flex: 1 1 360px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #2C3039">
+        <div style="background: #1D2026; padding: 20px; display: flex; flex-direction: column; gap: 4px"><span class="lbl" style="color: #9AA0AC">Distance</span><span style="font-size: 28px; font-weight: 700">180.6 km</span></div>
+        <div style="background: #1D2026; padding: 20px; display: flex; flex-direction: column; gap: 4px"><span class="lbl" style="color: #9AA0AC">Winner</span><span style="font-size: 18px; font-weight: 700">T. Pogačar</span></div>
+        <div style="background: #1D2026; padding: 20px; display: flex; flex-direction: column; gap: 4px"><span class="lbl" style="color: #9AA0AC">Avg speed</span><span style="font-size: 28px; font-weight: 700">[x] km/h</span></div>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section class="card" aria-label="Top 10 finishers" style="flex: 999 1 520px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px">
+          <h2 class="h2">Top 10 finishers</h2>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <div role="group" aria-label="View" style="display: inline-flex; border: 1px solid #D5D8DE; border-radius: 999px; padding: 3px">
+              <button class="chip on" aria-pressed="true" style="height: 34px; border: 0">Riders</button>
+              <button class="chip" aria-pressed="false" style="height: 34px; border: 0">By team</button>
+            </div>
+            <span class="tag">E2</span>
+          </div>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl num">
+            <thead><tr><th>#</th><th>Rider</th><th>Team</th><th>Nat.</th><th class="r">Adjusted time</th><th class="r">Gap</th><th class="r">Bonus</th></tr></thead>
+            <tbody>
+              <sc-for list="{{top}}" as="t" hint-placeholder-count="10">
+                <tr><td style="font-weight: 700">{{t.rank}}</td><td style="font-weight: 600">{{t.name}}</td><td style="color: #5B6170">{{t.team}}</td><td>{{t.nat}}</td><td class="r">{{t.time}}</td><td class="r">{{t.gap}}</td><td class="r" style="color: #1E6B3E">{{t.bonus}}</td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="card" aria-label="Teams in the top 10" style="flex: 1 1 300px; display: flex; flex-direction: column; gap: 12px">
+        <h2 class="h2">Which squads filled the top 10</h2>
+        <sc-for list="{{teams}}" as="m" hint-placeholder-count="6">
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <div class="num" style="display: flex; justify-content: space-between; font-size: 14px"><span>{{m.name}}</span><span style="font-weight: 700">{{m.n}}</span></div>
+            <div style="height: 10px; background: #F0F1F4; border-radius: 4px"><div style="height: 10px; width: {{m.pct}}%; background: #2E5FA8; border-radius: 4px"></div></div>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section class="card" aria-label="Time-trial catalogue" style="flex: 1 1 400px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline"><h2 class="h2">Against the clock</h2><span class="tag">E11</span></div>
+        <sc-for list="{{itt}}" as="i" hint-placeholder-count="2">
+          <a href="Stages.dc.html" style="display: grid; grid-template-columns: 54px 1fr auto; gap: 14px; align-items: center; padding: 12px; border: 1px solid #E3E5EA; border-radius: 10px; text-decoration: none">
+            <span class="num" style="height: 54px; border-radius: 8px; background: #8D7FE0; color: #15171C; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px">{{i.n}}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span style="font-weight: 700">{{i.route}}</span><span class="num" style="font-size: 13px; color: #5B6170">{{i.date}} · {{i.km}}</span></span>
+            <span style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px"><span class="lbl">Winner</span><span style="font-weight: 600">{{i.win}}</span></span>
+          </a>
+        </sc-for>
+      </section>
+      <section class="card" aria-label="Stages by distance" style="flex: 1 1 400px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline"><h2 class="h2">The long day</h2><span class="tag">E15</span></div>
+        <span style="font-size: 13px; color: #5B6170">Stages sorted by distance · longest highlighted</span>
+        <sc-for list="{{longest}}" as="l" hint-placeholder-count="8">
+          <div class="num" style="display: grid; grid-template-columns: 180px 1fr 70px; gap: 10px; align-items: center; font-size: 14px">
+            <span style="font-weight: {{l.fw}}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{l.label}}</span>
+            <div style="height: 16px; background: #F0F1F4; border-radius: 4px"><div style="height: 16px; width: {{l.pct}}%; background: {{l.c}}; border-radius: 4px; outline: {{l.ol}}"></div></div>
+            <span style="text-align: right; font-weight: 600">{{l.km}}</span>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var C = { flat: '#8FB3D9', hilly: '#E59A3C', mountain: '#B5644A', itt: '#8D7FE0' };
+    var types = ['flat','hilly','flat','hilly','itt','hilly','hilly','flat','flat','mountain','flat','mountain','itt','mountain','hilly','mountain','flat','mountain','mountain','hilly','flat'];
+    var stages = types.map(function (t, i) {
+      var sel = i === 11;
+      return { n: i + 1, sel: sel ? 'true' : 'false', bg: C[t], fg: t === 'mountain' ? '#fff' : '#15171C', bd: sel ? '#15171C' : 'transparent', title: 'Stage ' + (i + 1) + ', ' + t };
+    });
+    var top = [
+      ['Tadej Pogačar','UAE Team Emirates XRG','SLO','4:32:41','—','10″'],
+      ['Jonas Vingegaard','Visma | Lease a Bike','DEN','4:34:57','+2′10″','6″'],
+      ['Florian Lipowitz','Red Bull–BORA–hansgrohe','GER','4:35:16','+2′23″','4″'],
+      ['Oscar Onley','Picnic PostNL','GBR','4:35:28','+2′35″','0″'],
+      ['Felix Gall','Decathlon AG2R','AUT','4:35:47','+2′54″','0″'],
+      ['Primož Roglič','Red Bull–BORA–hansgrohe','SLO','4:36:02','+3′09″','0″'],
+      ['T. Halland Johannessen','Uno-X Mobility','NOR','4:36:10','+3′17″','0″'],
+      ['Kévin Vauquelin','Arkéa–B&B Hotels','FRA','4:36:20','+3′27″','0″'],
+      ['[Rider 9]','[Team]','[NAT]','4:36:33','+3′40″','0″'],
+      ['[Rider 10]','[Team]','[NAT]','4:36:48','+3′55″','0″']
+    ].map(function (r, i) { return { rank: i + 1, name: r[0], team: r[1], nat: r[2], time: r[3], gap: r[4], bonus: r[5] }; });
+    var teams = [['Red Bull–BORA–hansgrohe',2],['UAE Team Emirates XRG',1],['Visma | Lease a Bike',1],['Picnic PostNL',1],['Decathlon AG2R',1],['Other squads',4]]
+      .map(function (t) { return { name: t[0], n: t[1], pct: t[1] / 4 * 100 }; });
+    var itt = [
+      { n: 5, route: 'Caen → Caen', date: 'Wed 9 Jul 2025', km: '33.0 km', win: 'R. Evenepoel' },
+      { n: 13, route: 'Loudenvielle → Peyragudes', date: 'Fri 18 Jul 2025', km: '10.9 km', win: 'T. Pogačar' }
+    ];
+    var L = [[2,'Lauwin-Planque → Boulogne',209.1,'hilly'],[6,'Bayeux → Vire',201.5,'hilly'],[7,'Saint-Malo → Mûr-de-Bretagne',197.0,'hilly'],[1,'Lille → Lille',184.9,'flat'],[20,'Nantua → Pontarlier',184.2,'hilly'],[14,'Pau → Luchon-Superbagnères',182.6,'mountain'],[12,'Auch → Hautacam',180.6,'mountain'],[3,'Valenciennes → Dunkerque',178.3,'flat']];
+    var longest = L.map(function (l, i) {
+      return { label: 'S' + l[0] + ' · ' + l[1], km: l[2].toFixed(1), pct: (l[2] / 209.1 * 100).toFixed(1), c: C[l[3]], fw: i === 0 ? 700 : 400, ol: i === 0 ? '2px solid #15171C' : 'none' };
+    });
+    return { stages: stages, top: top, teams: teams, itt: itt, longest: longest };
+  }
+}
+</script>
+</body>
+</html>
