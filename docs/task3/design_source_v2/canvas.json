@@ -1,0 +1,22 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-29T14:00:00Z"},
+  "title": "LeTour OLAP Dashboard UI v2",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 2050, "title": "1 · Overview (E10 rank/time toggle, rider picker, inflections)", "expand": "fill", "is_interactive": true},
+    "Classifications.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 2050, "title": "2 · GC & Classifications (E1 multi-select + GC standing, E7, E4)", "expand": "fill", "is_interactive": true},
+    "Stages.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 1600, "title": "3 · Stages (E2, E15)", "expand": "fill"},
+    "TimeTrials.dc.html": {"x": 4560, "y": 0, "w": 1440, "h": 1500, "title": "3b · Time Trials (E11, new page)", "expand": "fill", "is_interactive": true},
+    "Riders.dc.html": {"x": 0, "y": 2290, "w": 1440, "h": 1900, "title": "4 · Riders (E5 drill-down, E6, E12)", "expand": "fill"},
+    "Teams.dc.html": {"x": 1520, "y": 2290, "w": 1440, "h": 1750, "title": "5 · Teams (E3, E14 counting, E13)", "expand": "fill"},
+    "Nations.dc.html": {"x": 3040, "y": 2290, "w": 1440, "h": 1750, "title": "6 · Nations (E8 country selector, E9)", "expand": "fill"}
+  },
+  "order": ["Main.dc.html", "Classifications.dc.html", "Stages.dc.html", "TimeTrials.dc.html", "Riders.dc.html", "Teams.dc.html", "Nations.dc.html"],
+  "notes": {
+    "title": {"x": 0, "y": -300, "text": "LeTour Analytics · design v2 · real Tour de France 2025 values", "kind": "title1", "maxW": 6000},
+    "changes": {"x": 4560, "y": 2290, "w": 620, "size": "m", "fill": "orange", "text": "What changed in v2 (user notes, 29 Oct)\n\n• Overview: rider/team picker (default final top 5); E10 toggle GC rank / Cumulative time; every inflection marked and listed by stage; yellow changes numbered.\n• GC: leaderboard rows multi-select (default top 5); E1 chart = overall GC standing per stage; Bonus + Penalty columns right after Gap; E4 age anchored at race start (5 Jul 2025).\n• Time Trials: own page (E11) with ITT results and GC impact.\n• Riders: E5 Mountain contours drill-down panel.\n• Teams: E14 counts every rider (2 from one team = 2), plus Stages and Riders columns.\n• Nations: E8 country selector.\n\nAll numbers come from the loaded LeTour DB. Points/KOM columns stay empty until the method is approved."}
+  },
+  "designSystems": []
+}
