@@ -51,19 +51,6 @@ def _types_changed():
     state._types_prev = state.w_types
 
 
-def _summary(state, nation_names, rider_filters):
-    """One line naming the active filters, shown as the title of the collapsed bar."""
-    chosen = [t for t in (state.w_types or []) if t != "All"]
-    parts = ["all 21 stages" if state.w_from == 1 and state.w_to == 21 else f"stages {state.w_from}–{state.w_to}"]
-    if chosen:
-        parts.append(" + ".join(chosen))
-    if rider_filters and state.w_team:
-        parts.append(state.w_team)
-    if rider_filters and state.w_nation:
-        parts.append(nation_names[state.w_nation])
-    return ", ".join(parts)
-
-
 def bar(rider_filters=False, young=False):
     """Draws the filter bar and returns the current Filters. Stops the page if no stage matches.
 
@@ -85,10 +72,10 @@ def bar(rider_filters=False, young=False):
     nations = queries.rider_nations()
     nation_names = dict(zip(nations["iso"], nations["country_name"]))
 
-    active = (state.w_from != 1 or state.w_to != 21 or state.w_types != ["All"]
-              or (rider_filters and (state.w_team or state.w_nation)) or (young and state.w_cutoff != 26))
     with st.container(key="card_filters"):
-        with st.expander(f"Filters: {_summary(state, nation_names, rider_filters)}", expanded=bool(active)):
+        # The title and expanded flag must never change: Streamlit redraws the section closed if they do,
+        # so only the arrow opens or closes it. The summary of active filters sits below instead.
+        with st.expander("Filters", expanded=False):
             widths = [1.45, 1.45, 3.0] + ([1.4, 1.4] if rider_filters else []) + ([1.3] if young else [])
             columns = iter(st.columns(widths, vertical_alignment="bottom"))
             next(columns).selectbox("Stages from", list(labels), key="w_from", format_func=labels.get, on_change=_keep_order, args=("from",))
@@ -109,10 +96,15 @@ def bar(rider_filters=False, young=False):
                 nation=state.w_nation if rider_filters else None,
                 cutoff=int(state.w_cutoff),
             )
-            selected = queries.selected_stages(f)
-            if not selected.empty:
-                extra = " The team and nation filters narrow rider lists while ranks stay race-wide." if rider_filters else ""
-                ui.note(f"{len(selected)} of 21 stages selected ({', '.join(map(str, selected['stage_no']))}). GC is recomputed over them.{extra}")
+        selected = queries.selected_stages(f)
+        if not selected.empty:
+            parts = [f"{len(selected)} of 21 stages ({', '.join(map(str, selected['stage_no']))})"]
+            if f.team:
+                parts.append(f"team: {f.team}")
+            if f.nation:
+                parts.append(f"nation: {nation_names[f.nation]}")
+            extra = " The team and nation filters narrow rider lists while ranks stay race-wide." if rider_filters else ""
+            ui.note("Showing " + " · ".join(parts) + f". GC is recomputed over the selected stages.{extra}")
     if selected.empty:
         ui.html('<div class="callout">No stage matches these filters. Widen the stage range or pick another stage type.</div>')
         st.stop()

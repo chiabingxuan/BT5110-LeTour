@@ -64,3 +64,16 @@ def test_dates_format_without_platform_specific_codes():
     assert fmt.short_date(day) == "5 Jul"
     offenders = [path.name for path in DASHBOARD.rglob("*.py") if re.search(r"%[-#][a-zA-Z]", path.read_text(encoding="utf-8"))]
     assert not offenders
+
+
+def test_filter_banner_does_not_change_when_a_filter_changes():
+    """A changed expander title or flag makes Streamlit redraw it closed, so clicking a filter shut the banner."""
+
+    def banner(state):
+        app = AppTest.from_file(str(DASHBOARD / "app.py"), default_timeout=30)
+        for key, value in state.items():
+            app.session_state[key] = value
+        app.run()
+        return app.expander[0].label, app.expander[0].proto.expanded
+
+    assert banner({}) == banner({"w_types": ["Flat"], "w_from": 3, "w_to": 9})

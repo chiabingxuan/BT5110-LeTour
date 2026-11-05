@@ -62,7 +62,8 @@ h1.page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; f
 
 /* The filter card already draws the frame around its collapsible section */
 .st-key-card_filters [data-testid="stExpander"] details { border: 0; }
-.st-key-card_filters { padding: 4px 8px; }
+.st-key-card_filters { padding: 4px 8px 10px 8px; gap: 2px; }
+.st-key-card_filters .note { padding: 0 16px; }
 
 /* Small helpers */
 .bar-track { height: 10px; background: #F0F1F4; border-radius: 4px; overflow: hidden; }
