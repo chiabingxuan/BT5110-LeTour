@@ -65,6 +65,16 @@ def difference(value):
     return f"▲{value}" if value > 0 else f"▼{-value}"
 
 
+def signed_places(value):
+    """Rank difference as a signed number: + better than the comparison, − worse."""
+    if _missing(value):
+        return "—"
+    value = int(value)
+    if value == 0:
+        return "0"
+    return f"+{value}" if value > 0 else f"−{-value}"
+
+
 def ordinal(n):
     n = int(n)
     if 10 <= n % 100 <= 20:

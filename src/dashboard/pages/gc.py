@@ -220,19 +220,20 @@ with ui.card("parallel", "Parallel classifications", tag="Req. b · E4",
             else "Official 2025 white-jersey rule: born on or after 1 Jan 2000.")
 
     compare = queries.compare(f, after, rule, f.cutoff)
-    show_all_par = st.toggle(f"Show all {len(f.narrow(compare))} riders", key="w_par_all")
+    c1, c2 = st.columns(2)
+    show_all_par = c1.toggle(f"Show all {len(f.narrow(compare))} riders", key="w_par_all")
+    show_derived = c2.toggle("Add Points and KOM (req. b)", key="w_par_derived")
     rows = f.narrow(compare if show_all_par else compare[(compare["gc_rank"] <= 10) | compare["rider_bib"].isin(compare_set)])
-    view = pd.DataFrame({
-        "Rider": rows["rider_name"],
-        f"Age at start ({fmt.medium_date(start)})": rows["age_at_start"],
-        "GC": rows["gc_rank"],
-        "Points*": rows["points_rank"].map(fmt.rank_or_dash),
-        "KOM*": rows["kom_rank"].map(fmt.rank_or_dash),
-        "Young": rows["young_rank"].map(fmt.rank_or_dash),
-        "Mountain proxy": rows["mountain_rank"].map(fmt.rank_or_dash),
-        "Proxy vs GC": rows["proxy_vs_gc"].map(fmt.difference),
-    })
-    ui.table(view, right=["Points*", "KOM*", "Young", "Mountain proxy", "Proxy vs GC"], moves=["Proxy vs GC"])
-    ui.note("Age = age on the first stage date, never today's age. Mountain proxy = Σ adjusted time on the selected mountain stages, "
-            "ranked among riders who finished all of them; ▼ = lower on mountains than overall. "
-            "*Points and KOM are derived from finishing positions, not the official scoring (see About / Method).")
+    columns = {"Rider": rows["rider_name"], "Age": rows["age_at_start"], "Overall GC": rows["gc_rank"]}
+    if show_derived:
+        columns["Points*"] = rows["points_rank"].map(fmt.rank_or_dash)
+        columns["KOM*"] = rows["kom_rank"].map(fmt.rank_or_dash)
+    columns["Young GC"] = rows["young_rank"].map(fmt.rank_or_dash)
+    columns["Mountain GC Proxy"] = rows["mountain_rank"].map(fmt.rank_or_dash)
+    columns["Proxy vs GC"] = rows["proxy_vs_gc"].map(fmt.signed_places)
+    view = pd.DataFrame(columns)
+    text_columns = [c for c in view.columns if c not in ("Rider", "Age", "Overall GC")]
+    ui.table(view, moves=["Proxy vs GC"], column_config={c: st.column_config.TextColumn(c, alignment="right") for c in text_columns})
+    derived_note = " *Points and KOM are derived from finishing positions, not the official scoring (see About / Method)." if show_derived else ""
+    ui.note(f"Age = age at race start ({fmt.medium_date(start)}), never today's age. Mountain GC Proxy = Σ adjusted time on the selected mountain stages, "
+            "ranked among riders who finished all of them. Proxy vs GC = Overall GC − proxy rank: + means higher on the mountains than overall, − means lower." + derived_note)

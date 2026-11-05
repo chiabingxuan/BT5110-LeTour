@@ -168,9 +168,9 @@ def bar_html(pct, colour="#7C8291"):
 
 def _move_colour(value):
     if isinstance(value, str):
-        if value.startswith("▲"):
+        if value.startswith(("▲", "+")):
             return "color:#1E6B3E;font-weight:700"
-        if value.startswith("▼"):
+        if value.startswith(("▼", "−")):
             return "color:#A1262C;font-weight:700"
     return ""
 

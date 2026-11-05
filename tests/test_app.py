@@ -26,6 +26,7 @@ SCENARIOS = {
     "gc after early stage": {"w_after": 3},
     "top-10 movement appears": {"w_from": 8},
     "all riders tables": {"w_par_all": True, "w_gc_all": True},
+    "points and kom shown": {"w_par_derived": True},
     "exited rider": {"w_rider": 64},
     "no stage matches": {"w_from": 1, "w_to": 2, "w_types": ["ITT"]},
 }
