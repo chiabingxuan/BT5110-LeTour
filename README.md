@@ -133,7 +133,7 @@ python -m pytest tests
 - **Points and King of the Mountains are derived.** The schema stores no points, so both come from stage finishing positions, using the scales in `v_points_scale` (`src/sql/views/03_classifications.sql`). This is not the official scoring: the data has no intermediate sprints or categorised climbs. The derived KOM leader matches the official winner (Pogačar). The derived Points leader (Pogačar) does not match the official winner (Milan).
 - **Young rider** defaults to age at race start (5 Jul 2025) under 26, with the cutoff adjustable. The official rule, born on or after 1 Jan 2000, is a switch on the GC page. Only the official rule gives the official podium; the age rule also admits Tobias Johannessen, who places 3rd.
 - **Pivotal moment** is the stage with the largest swing in a rider's gap to the GC leader; ties go to the bigger rank change, then the later stage.
-- **Yellow jersey ties** are broken by the lowest sum of stage placings.
+- **GC ties** are broken by the lower sum of stage placings so far, then the better placing on the latest stage, in every replay as well.
 - **Top-10 finishes** count every rider, so two riders from one team on one stage count 2.
 - **After changing SQL views**, every group member must run `python src/init_db.py --views-only`, or the app will not find new columns and functions.
 

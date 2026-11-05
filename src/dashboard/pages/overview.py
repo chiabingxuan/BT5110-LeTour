@@ -101,7 +101,7 @@ with ui.card("story", "GC storyline", tag="E10",
         )
         ties = yellow[yellow["is_tie"]]
         tie_note = "".join(
-            f'<div class="note" style="margin-top:6px">Stage {r.stage_no}: level on time ({escape(r.tied_with)}), so both show GC rank 1. The lower sum of stage placings puts yellow on {escape(r.holder_name)}.</div>'
+            f'<div class="note" style="margin-top:6px">Stage {r.stage_no}: level on time ({escape(r.tied_with)}); the lower sum of stage placings puts {escape(r.holder_name)} first.</div>'
             for r in ties.itertuples()
         )
         biggest = ""

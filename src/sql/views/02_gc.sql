@@ -1,12 +1,14 @@
 -- General classification, recomputed over any slice of stages.
 -- A rider is ranked after a stage only with a result on every selected stage up to it.
+-- Riders level on time are separated by the lower sum of stage placings so far, then by the better
+-- placing on the latest stage. Stage ranks are unique, so no two riders ever share a GC rank.
 
 -- E1, E7, E10: GC after each selected stage. p_cf: 'actual' | 'no_bonus' | 'no_penalty' | 'no_both'.
 CREATE OR REPLACE FUNCTION fn_gc_by_stage(p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL, p_cf text DEFAULT 'actual')
 RETURNS TABLE (rider_bib int, stage_no int, seq int, stage_time float8, cum_time float8, gc_rank int, gap float8, prev_rank int, prev_gap float8)
 LANGUAGE sql STABLE AS $$
     WITH timed AS (
-        SELECT sr.rider_bib, sel.stage_no, sel.seq,
+        SELECT sr.rider_bib, sel.stage_no, sel.seq, sr.rank AS stage_rank,
             CASE p_cf
                 WHEN 'no_bonus' THEN sr.finish_time + sr.time_penalty
                 WHEN 'no_penalty' THEN sr.finish_time - sr.time_bonus
@@ -19,13 +21,14 @@ LANGUAGE sql STABLE AS $$
     cumulative AS (
         SELECT t.*,
             SUM(t.stage_time) OVER w AS cum_time,
+            SUM(t.stage_rank) OVER w AS place_sum,
             COUNT(*) OVER w AS stages_done
         FROM timed t
         WINDOW w AS (PARTITION BY t.rider_bib ORDER BY t.seq)
     ),
     ranked AS (
         SELECT c.*,
-            (RANK() OVER (PARTITION BY c.seq ORDER BY c.cum_time))::int AS gc_rank,
+            (RANK() OVER (PARTITION BY c.seq ORDER BY c.cum_time, c.place_sum, c.stage_rank))::int AS gc_rank,
             c.cum_time - MIN(c.cum_time) OVER (PARTITION BY c.seq) AS gap
         FROM cumulative c
         WHERE c.stages_done = c.seq
@@ -57,18 +60,20 @@ LANGUAGE sql STABLE AS $$
             SUM(sr.finish_time - sr.time_bonus)::float8 AS no_penalty_time,
             SUM(sr.finish_time)::float8 AS no_both_time,
             SUM(sr.time_bonus)::float8 AS total_bonus,
-            SUM(sr.time_penalty)::float8 AS total_penalty
+            SUM(sr.time_penalty)::float8 AS total_penalty,
+            SUM(sr.rank) AS place_sum,
+            MAX(sr.rank) FILTER (WHERE sel.seq = (SELECT MAX(seq) FROM sel)) AS last_rank
         FROM stage_results sr
         JOIN sel ON sel.stage_id = sr.stage_id
         GROUP BY sr.rider_bib
         HAVING COUNT(*) = (SELECT COUNT(*) FROM sel)
     )
     SELECT t.rider_bib,
-        (RANK() OVER (ORDER BY t.actual_time))::int, t.actual_time, t.actual_time - MIN(t.actual_time) OVER (),
+        (RANK() OVER (ORDER BY t.actual_time, t.place_sum, t.last_rank))::int, t.actual_time, t.actual_time - MIN(t.actual_time) OVER (),
         t.total_bonus, t.total_penalty,
-        (RANK() OVER (ORDER BY t.no_bonus_time))::int, t.no_bonus_time, t.no_bonus_time - MIN(t.no_bonus_time) OVER (),
-        (RANK() OVER (ORDER BY t.no_penalty_time))::int, t.no_penalty_time, t.no_penalty_time - MIN(t.no_penalty_time) OVER (),
-        (RANK() OVER (ORDER BY t.no_both_time))::int, t.no_both_time, t.no_both_time - MIN(t.no_both_time) OVER ()
+        (RANK() OVER (ORDER BY t.no_bonus_time, t.place_sum, t.last_rank))::int, t.no_bonus_time, t.no_bonus_time - MIN(t.no_bonus_time) OVER (),
+        (RANK() OVER (ORDER BY t.no_penalty_time, t.place_sum, t.last_rank))::int, t.no_penalty_time, t.no_penalty_time - MIN(t.no_penalty_time) OVER (),
+        (RANK() OVER (ORDER BY t.no_both_time, t.place_sum, t.last_rank))::int, t.no_both_time, t.no_both_time - MIN(t.no_both_time) OVER ()
     FROM totals t
 $$;
 
@@ -91,30 +96,23 @@ LANGUAGE sql STABLE AS $$
     WHERE s.rn = 1
 $$;
 
--- E10: who holds yellow after each stage. Riders level on time are separated by the lowest sum of stage
--- placings, the official tie-break. change_no numbers each stage where the jersey changes hands.
+-- E10: who holds yellow (GC rank 1) after each stage. is_tie flags a lead decided by the tie-break rather
+-- than by time. change_no numbers each stage where the jersey changes hands.
 CREATE OR REPLACE FUNCTION fn_yellow_changes(p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL)
 RETURNS TABLE (stage_no int, seq int, holder_bib int, holder_name varchar, is_tie boolean, tied_with text, is_change boolean, change_no int)
 LANGUAGE sql STABLE AS $$
-    WITH places AS (
-        SELECT sr.rider_bib, sel.seq, SUM(sr.rank) OVER (PARTITION BY sr.rider_bib ORDER BY sel.seq) AS place_sum
-        FROM stage_results sr
-        JOIN fn_stage_selection(p_from, p_to, p_types) sel ON sel.stage_id = sr.stage_id
-    ),
-    leaders AS (
-        SELECT g.stage_no, g.seq, g.rider_bib, r.name,
+    WITH level AS (
+        SELECT g.seq, g.gc_rank, g.rider_bib, g.stage_no, r.name,
             COUNT(*) OVER (PARTITION BY g.seq) AS tied,
-            STRING_AGG(r.name, ', ') OVER (PARTITION BY g.seq) AS names,
-            ROW_NUMBER() OVER (PARTITION BY g.seq ORDER BY p.place_sum, g.rider_bib) AS rn
+            STRING_AGG(r.name, ', ') OVER (PARTITION BY g.seq) AS names
         FROM fn_gc_by_stage(p_from, p_to, p_types, 'actual') g
-        JOIN places p ON p.rider_bib = g.rider_bib AND p.seq = g.seq
         JOIN riders r ON r.bib_num = g.rider_bib
-        WHERE g.gc_rank = 1
+        WHERE g.gap = 0
     ),
     flagged AS (
         SELECT l.*, COALESCE(LAG(l.rider_bib) OVER (ORDER BY l.seq) <> l.rider_bib, TRUE) AS is_change
-        FROM leaders l
-        WHERE l.rn = 1
+        FROM level l
+        WHERE l.gc_rank = 1
     )
     SELECT f.stage_no, f.seq, f.rider_bib, f.name, f.tied > 1, CASE WHEN f.tied > 1 THEN f.names END, f.is_change,
         (SUM(f.is_change::int) OVER (ORDER BY f.seq))::int
@@ -138,10 +136,13 @@ $$;
 CREATE OR REPLACE FUNCTION fn_top10_movement(p_cf text, p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL)
 RETURNS TABLE (stage_no int, rider_bib int, actual_rank int, replay_rank int, movement text)
 LANGUAGE sql STABLE AS $$
+    -- MATERIALIZED: joining the two replays inline makes the planner pick a very slow plan
+    WITH a AS MATERIALIZED (SELECT * FROM fn_gc_by_stage(p_from, p_to, p_types, 'actual')),
+    r AS MATERIALIZED (SELECT * FROM fn_gc_by_stage(p_from, p_to, p_types, p_cf))
     SELECT a.stage_no, a.rider_bib, a.gc_rank, r.gc_rank,
         CASE WHEN r.gc_rank <= 10 THEN 'enters' ELSE 'leaves' END
-    FROM fn_gc_by_stage(p_from, p_to, p_types, 'actual') a
-    JOIN fn_gc_by_stage(p_from, p_to, p_types, p_cf) r ON r.rider_bib = a.rider_bib AND r.seq = a.seq
+    FROM a
+    JOIN r ON r.rider_bib = a.rider_bib AND r.seq = a.seq
     WHERE (a.gc_rank <= 10) <> (r.gc_rank <= 10)
 $$;
 

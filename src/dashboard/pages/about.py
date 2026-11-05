@@ -21,7 +21,7 @@ with ui.card("definitions", "Definitions"):
 - **Young rider**: age at race start (first stage date, 5 Jul 2025) under the cutoff, default 26. The official 2025 rule, born on or after 1 Jan 2000, is a switch on the GC page. The two rules disagree for riders born in the second half of 1999: Tobias Johannessen is 3rd under the age rule; the official podium is Lipowitz, Onley, Vauquelin.
 - **Mountain proxy**: adjusted time summed over the selected mountain stages only, ranked among riders who finished all of them.
 - **Inflection point (E10)**: a stage where a plotted rider's GC rank differs from the previous selected stage.
-- **Yellow jersey**: rank 1 on cumulative adjusted time. Riders level on time share GC rank 1, and the lowest sum of stage placings decides who wears yellow. After stage 4, Pogačar and Van Der Poel are level on 16:46:00; Van Der Poel keeps yellow on placings (54 against 92), and Pogačar takes it at stage 5.
+- **Ties in GC**: riders level on cumulative time are separated by the lower sum of stage placings so far, then by the better placing on the latest stage, so no two riders share a rank. After stage 4, Pogačar and Van Der Poel are level on 16:46:00; Van Der Poel is 1st on placings (54 against 92) and keeps yellow, and Pogačar takes it at stage 5.
 - **Pivotal moment (E1)**: the stage with the largest swing in a rider's gap to the GC leader; ties go to the bigger rank change, then the later stage.
 - **Top-10 finishes (E14)**: rank ≤ 10 in finishing order. Every rider counts, so two riders from one team on the same stage count twice; the cell drill-down shows the stages and riders behind a number.
 """)

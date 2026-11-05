@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION fn_young_gc(
 )
 RETURNS TABLE (rider_bib int, young_rank int, cum_time float8, gc_rank int, gap_to_gc_leader float8)
 LANGUAGE sql STABLE AS $$
-    SELECT g.rider_bib, (RANK() OVER (ORDER BY g.cum_time))::int, g.cum_time, g.gc_rank, g.gap
+    SELECT g.rider_bib, (RANK() OVER (ORDER BY g.gc_rank))::int, g.cum_time, g.gc_rank, g.gap
     FROM fn_gc_final(p_from, p_to, p_types, p_after) g
     JOIN v_riders r ON r.rider_bib = g.rider_bib
     WHERE (p_rule = 'official' AND r.born_2000_plus)

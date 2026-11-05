@@ -197,3 +197,35 @@ def test_top10_movement_matches_final_ranks(cur):
 def test_exited_rider_has_gc_rows_until_exit(cur):
     last = one(cur, "SELECT MAX(stage_no) FROM fn_gc_by_stage() WHERE rider_bib = 106")
     assert last == 15  # Van Der Poel: DNS at stage 16
+
+
+# ---------- GC tie-break ----------
+
+def test_stage_4_tie_is_broken_on_stage_placings(cur):
+    assert rows(cur, """
+        SELECT r.name, g.gc_rank, g.gap FROM fn_gc_by_stage() g JOIN riders r ON r.bib_num = g.rider_bib
+        WHERE g.stage_no = 4 AND g.gc_rank <= 2 ORDER BY g.gc_rank
+    """) == [("Mathieu Van Der Poel", 1, 0), ("Tadej Pogacar", 2, 0)]
+    assert one(cur, "SELECT gc_rank FROM fn_gc_by_stage() WHERE stage_no = 5 AND rider_bib = 1") == 1
+
+
+def test_no_two_riders_share_a_gc_rank(cur):
+    assert one(cur, """
+        SELECT COUNT(*) FROM (SELECT seq, gc_rank FROM fn_gc_by_stage() GROUP BY seq, gc_rank HAVING COUNT(*) > 1) x
+    """) == 0
+    for column in ("gc_rank", "no_bonus_rank", "no_penalty_rank", "no_both_rank"):
+        assert one(cur, f"SELECT COUNT(*) - COUNT(DISTINCT {column}) FROM v_gc_final") == 0
+
+
+def test_top_ten_is_exactly_ten_riders_after_every_stage(cur):
+    assert one(cur, """
+        SELECT COUNT(*) FROM (SELECT seq FROM fn_gc_by_stage() WHERE gc_rank <= 10 GROUP BY seq HAVING COUNT(*) <> 10) x
+    """) == 0
+
+
+def test_top10_movement_finds_the_stage_10_swap(cur):
+    # From stage 7 on, removing bonuses swaps Roglic into the top 10 and Arensman out at stage 10
+    assert rows(cur, """
+        SELECT m.stage_no, m.movement, r.name FROM fn_top10_movement('no_bonus', 7, 21) m
+        JOIN riders r ON r.bib_num = m.rider_bib WHERE m.stage_no = 10 ORDER BY m.movement
+    """) == [(10, "enters", "Primoz Roglic"), (10, "leaves", "Thymen Arensman")]
