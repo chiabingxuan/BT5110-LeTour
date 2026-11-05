@@ -74,12 +74,17 @@ def ordinal(n):
     return f"{n}{suffix}"
 
 
+# value.day gives the day without a leading zero; strftime's no-padding flag fails on Windows
 def long_date(value):
-    return value.strftime("%a %-d %b %Y")
+    return f"{value:%a} {value.day} {value:%b %Y}"
+
+
+def medium_date(value):
+    return f"{value.day} {value:%b %Y}"
 
 
 def short_date(value):
-    return value.strftime("%-d %b")
+    return f"{value.day} {value:%b}"
 
 
 def rank_or_dash(value):

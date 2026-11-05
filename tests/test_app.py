@@ -1,4 +1,5 @@
 """Smoke test: every page must draw without an exception under ordinary and edge-case filters."""
+import re
 import sys
 from pathlib import Path
 
@@ -43,3 +44,17 @@ def test_navigation_reaches_the_page(page, widget):
     app.switch_page(f"pages/{page}.py")
     app.run()
     assert app.selectbox(key=widget) is not None
+
+
+def test_dates_format_without_platform_specific_codes():
+    """Windows strftime rejects glibc codes such as "%-d", which crashed every page there."""
+    from datetime import date
+
+    from lib import format as fmt
+
+    day = date(2025, 7, 5)
+    assert fmt.long_date(day) == "Sat 5 Jul 2025"
+    assert fmt.medium_date(day) == "5 Jul 2025"
+    assert fmt.short_date(day) == "5 Jul"
+    offenders = [path.name for path in DASHBOARD.rglob("*.py") if re.search(r"%[-#][a-zA-Z]", path.read_text(encoding="utf-8"))]
+    assert not offenders

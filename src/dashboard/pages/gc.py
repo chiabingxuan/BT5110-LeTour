@@ -159,7 +159,7 @@ with ui.card("parallel", "Parallel classifications", tag="Req. b · E4",
     rows = f.narrow(compare[(compare["gc_rank"] <= 10) | compare["rider_bib"].isin(compare_set)])
     view = pd.DataFrame({
         "Rider": rows["rider_name"],
-        f"Age at start ({start.strftime('%-d %b %Y')})": rows["age_at_start"],
+        f"Age at start ({fmt.medium_date(start)})": rows["age_at_start"],
         "GC": rows["gc_rank"],
         "Points*": rows["points_rank"].map(fmt.rank_or_dash),
         "KOM*": rows["kom_rank"].map(fmt.rank_or_dash),

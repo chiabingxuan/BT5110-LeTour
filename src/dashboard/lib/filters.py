@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import streamlit as st
 
+from lib import format as fmt
 from lib import queries, ui
 
 TYPE_VALUES = {"Flat": "flat", "Hilly": "hilly", "Mountain": "mountain", "ITT": "individual time-trial"}
@@ -75,7 +76,7 @@ def bar():
         c[3].selectbox("Team", teams, key="w_team", index=None, placeholder="All teams")
         c[4].selectbox("Rider nation", list(nation_names), key="w_nation", index=None, placeholder="All nations",
                        format_func=lambda iso: f"{nation_names[iso]} ({iso})")
-        c[5].number_input(f"Young: age on {start.strftime('%-d %b %Y')} under", min_value=18, max_value=45, step=1, key="w_cutoff")
+        c[5].number_input(f"Young: age on {fmt.medium_date(start)} under", min_value=18, max_value=45, step=1, key="w_cutoff")
 
         chosen = [t for t in (state.w_types or []) if t != "All"]
         f = Filters(
