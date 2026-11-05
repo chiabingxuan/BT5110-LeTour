@@ -30,27 +30,23 @@ ui.kpi_tiles([
 ])
 
 
-def country_table(data, key, label):
-    """Bars inside a table, because a row click is a dependable way to drill into a country."""
+def country_table(data, label):
+    """Bars inside a table; the country chosen in the drill-down below stays highlighted."""
     view = pd.DataFrame({"Code": data["iso"], "Country": data["country_name"], label: data["n"]}).reset_index(drop=True)
     styler = view.style.apply(lambda c: ["background-color:#EEF3FA;font-weight:700" if code == state.w_country else "" for code in view["Code"]], subset=["Code", "Country"])
-    event = ui.table(view, key=key, select="row", styler=styler, height=40 + 35 * len(view), column_config={
+    ui.table(view, styler=styler, height=40 + 35 * len(view), column_config={
         label: st.column_config.ProgressColumn(label, format="%d", min_value=0, max_value=int(data["n"].max()), color="#2E5FA8"),
     })
-    row = ui.new_row(event, key)
-    if row is not None and view.iloc[row]["Code"] in names:
-        state._pending = {"w_country": view.iloc[row]["Code"], "w_outcome": None}
-        st.rerun()
 
 
 left, right = st.columns(2)
 with left:
-    with ui.card("riders_country", "Riders per country", tag="Req. d · E8", sub="By rider nationality (riders.country) · click a row to drill in"):
-        country_table(riders_by_country, "t_riders_country", "Riders")
+    with ui.card("riders_country", "Riders per country", tag="Req. d · E8", sub="By rider nationality (riders.country) · choose a country in the drill-down below"):
+        country_table(riders_by_country, "Riders")
 with right:
-    with ui.card("teams_country", "Teams per country", tag="Req. d · E8", sub="By team registration (teams.country) · independent of rider nationality · click a row to drill in"):
-        country_table(teams_by_country, "t_teams_country", "Teams")
-        ui.note("BRN, ISR and UAE register a team but have no rider in the race, so they have nothing to drill into.")
+    with ui.card("teams_country", "Teams per country", tag="Req. d · E8", sub="By team registration (teams.country) · independent of rider nationality"):
+        country_table(teams_by_country, "Teams")
+        ui.note("BRN, ISR and UAE register a team but have no rider in the race.")
     with ui.card("map", "Riders on the map", tag="Req. d", sub="Riders per nation"):
         st.plotly_chart(charts.choropleth(
             [MAP_CODES.get(iso, iso) for iso in riders_by_country["iso"]], list(riders_by_country["n"]), list(riders_by_country["country_name"]),

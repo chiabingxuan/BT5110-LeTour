@@ -89,16 +89,14 @@ def shade(value):
 
 with ui.card("intensity", "Top-10 intensity by team", tag="E14", sub="Top-10 stage finishes (rank ≤ 10, finishing order) by stage type · click a stage-type cell for its stages and riders"):
     ui.html('<div class="callout"><b>How it is counted.</b> Every rider counts: two riders from one team in the same stage\'s top 10 add 2 to that team. '
-            '<b>Stages</b> counts each stage once and <b>Riders</b> counts distinct riders, so the double-counting stays visible.</div>')
+            'The cell drill-down shows the stages and riders behind any number.</div>')
     top10 = queries.top10_by_team(f).reset_index(drop=True)
     present = [label for label, value in TYPE_COLUMNS.items() if value in set(selected["type"])]
     view = pd.DataFrame({"Team": top10["team"]})
     source = {"Flat": "flat", "Hilly": "hilly", "Mountain": "mountain", "ITT": "itt"}
     for label in present:
         view[label] = top10[source[label]]
-    view["Finishes"] = top10["finishes"]
-    view["Stages"] = top10["stages"]
-    view["Riders"] = top10["riders"]
+    view["Total"] = top10["finishes"]
     left, right = st.columns([5, 4])
     with left:
         event = ui.table(view, key="t_intensity", select="cell", styler=view.style.map(shade, subset=present), height=38 + 35 * len(view))

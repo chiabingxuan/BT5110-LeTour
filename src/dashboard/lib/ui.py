@@ -56,8 +56,13 @@ h1.page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; f
 [data-testid="stSidebar"] [data-testid="stPageLink"] p { font-size: 15px; font-weight: 500; color: #C9CCD3; }
 
 /* Rider picker wraps instead of hiding chips; daily-trace tiles stack stage over rank */
-[data-testid="stMultiSelect"] [data-baseweb="select"] > div:first-child { flex-wrap: wrap; }
+[data-testid="stMultiSelect"] [role="group"] { height: auto; min-height: 40px; }
+[data-testid="stMultiSelectTagsContainer"] { flex-wrap: wrap; height: auto; max-height: none; overflow: visible; }
 [class*="st-key-trace_"] button p { word-spacing: 100vw; line-height: 1.25; white-space: normal; text-align: center; font-size: 13px; }
+
+/* The filter card already draws the frame around its collapsible section */
+.st-key-card_filters [data-testid="stExpander"] details { border: 0; }
+.st-key-card_filters { padding: 4px 8px; }
 
 /* Small helpers */
 .bar-track { height: 10px; background: #F0F1F4; border-radius: 4px; overflow: hidden; }

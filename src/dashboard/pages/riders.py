@@ -15,7 +15,7 @@ if state.w_rider not in all_riders.index:
     state.w_rider = 1
 
 ui.header(["Riders", all_riders.loc[state.w_rider, "rider_name"]], "Rider performance")
-f = filters.bar()
+f = filters.bar(rider_filters=True)
 selected = queries.selected_stages(f)
 final = queries.gc_final(f)
 gc_rank = dict(zip(final["rider_bib"], final["gc_rank"]))
@@ -90,13 +90,10 @@ with left:
             ui.note("No mountain stages or riders match the current filter.")
         else:
             top = contours.head(12).reset_index(drop=True)
-            peak = max(top["mean_gap"].max(), 1)
             view = pd.DataFrame({
                 "Rider": top["rider_name"], "Mtn podiums": top["podiums"], "Mean gap": top["mean_gap"].map(fmt.gap),
-                "": top["mean_gap"] / peak,
             })
-            event = ui.table(view, key="t_contours", right=["Mean gap"], select="row",
-                             column_config={"": st.column_config.ProgressColumn("", format=" ", min_value=0, max_value=1, color="#B5644A")})
+            event = ui.table(view, key="t_contours", right=["Mean gap"], select="row")
             row = ui.new_row(event, "t_contours")
             if row is not None:
                 state._pending = {"w_mtn": int(top.iloc[row].rider_bib), "w_rider": int(top.iloc[row].rider_bib), "w_trace": "Mountain stages only"}

@@ -20,7 +20,12 @@ SCENARIOS = {
     "one-rider nation": {"w_nation": "RUS"},
     "one team": {"w_team": "LOTTO"},
     "low young cutoff": {"w_cutoff": 18},
-    "no bonus replay": {"w_cf": "Without bonuses"},
+    "replay without bonuses": {"w_cf_remove": ["Bonuses"]},
+    "replay without both": {"w_cf_remove": ["Bonuses", "Penalties"]},
+    "exited riders plotted": {"w_story": [1, 106], "w_gc_exited": [106], "w_focus": 106},
+    "gc after early stage": {"w_after": 3},
+    "top-10 movement appears": {"w_from": 8},
+    "all riders tables": {"w_par_all": True, "w_gc_all": True},
     "exited rider": {"w_rider": 64},
     "no stage matches": {"w_from": 1, "w_to": 2, "w_types": ["ITT"]},
 }

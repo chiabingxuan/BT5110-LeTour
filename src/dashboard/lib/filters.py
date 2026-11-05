@@ -51,8 +51,25 @@ def _types_changed():
     state._types_prev = state.w_types
 
 
-def bar():
-    """Draws the filter bar and returns the current Filters. Stops the page if no stage matches."""
+def _summary(state, nation_names, rider_filters):
+    """One line naming the active filters, shown as the title of the collapsed bar."""
+    chosen = [t for t in (state.w_types or []) if t != "All"]
+    parts = ["all 21 stages" if state.w_from == 1 and state.w_to == 21 else f"stages {state.w_from}–{state.w_to}"]
+    if chosen:
+        parts.append(" + ".join(chosen))
+    if rider_filters and state.w_team:
+        parts.append(state.w_team)
+    if rider_filters and state.w_nation:
+        parts.append(nation_names[state.w_nation])
+    return ", ".join(parts)
+
+
+def bar(rider_filters=False, young=False):
+    """Draws the filter bar and returns the current Filters. Stops the page if no stage matches.
+
+    The stage filters act on every page. rider_filters and young add the Team, Rider nation and
+    Young rider controls on the pages they act on, so no control on screen is ever without effect.
+    """
     state = st.session_state
     state.setdefault("w_from", 1)
     state.setdefault("w_to", 21)
@@ -68,36 +85,35 @@ def bar():
     nations = queries.rider_nations()
     nation_names = dict(zip(nations["iso"], nations["country_name"]))
 
-    with st.container(border=True, key="card_filters"):
-        c = st.columns([1.45, 1.45, 3.0, 1.4, 1.4, 1.3], vertical_alignment="bottom")
-        c[0].selectbox("Stages from", list(labels), key="w_from", format_func=labels.get, on_change=_keep_order, args=("from",))
-        c[1].selectbox("to", list(labels), key="w_to", format_func=labels.get, on_change=_keep_order, args=("to",))
-        c[2].pills("Stage type", ["All", *TYPE_VALUES], selection_mode="multi", key="w_types", on_change=_types_changed)
-        c[3].selectbox("Team", teams, key="w_team", index=None, placeholder="All teams")
-        c[4].selectbox("Rider nation", list(nation_names), key="w_nation", index=None, placeholder="All nations",
-                       format_func=lambda iso: f"{nation_names[iso]} ({iso})")
-        c[5].number_input(f"Young: age on {fmt.medium_date(start)} under", min_value=18, max_value=45, step=1, key="w_cutoff")
-
-        chosen = [t for t in (state.w_types or []) if t != "All"]
-        f = Filters(
-            stage_from=int(state.w_from),
-            stage_to=int(state.w_to),
-            types=[TYPE_VALUES[t] for t in chosen] or None,
-            team=state.w_team,
-            nation=state.w_nation,
-            cutoff=int(state.w_cutoff),
-        )
-        selected = queries.selected_stages(f)
-        if selected.empty:
-            ui.note("No stage matches these filters. Widen the stage range or pick another stage type.")
-        else:
-            parts = [f"{len(selected)} of 21 stages ({', '.join(map(str, selected['stage_no']))})"]
-            if f.team:
-                parts.append(f"team: {f.team}")
-            if f.nation:
-                parts.append(f"nation: {nation_names[f.nation]}")
-            ui.note("Showing " + " · ".join(parts) + ". GC is recomputed over the selected stages; "
-                    "the team and nation filters narrow rider lists while ranks stay race-wide.")
+    active = (state.w_from != 1 or state.w_to != 21 or state.w_types != ["All"]
+              or (rider_filters and (state.w_team or state.w_nation)) or (young and state.w_cutoff != 26))
+    with st.container(key="card_filters"):
+        with st.expander(f"Filters: {_summary(state, nation_names, rider_filters)}", expanded=bool(active)):
+            widths = [1.45, 1.45, 3.0] + ([1.4, 1.4] if rider_filters else []) + ([1.3] if young else [])
+            columns = iter(st.columns(widths, vertical_alignment="bottom"))
+            next(columns).selectbox("Stages from", list(labels), key="w_from", format_func=labels.get, on_change=_keep_order, args=("from",))
+            next(columns).selectbox("to", list(labels), key="w_to", format_func=labels.get, on_change=_keep_order, args=("to",))
+            next(columns).pills("Stage type", ["All", *TYPE_VALUES], selection_mode="multi", key="w_types", on_change=_types_changed)
+            if rider_filters:
+                next(columns).selectbox("Team", teams, key="w_team", index=None, placeholder="All teams")
+                next(columns).selectbox("Rider nation", list(nation_names), key="w_nation", index=None, placeholder="All nations",
+                                        format_func=lambda iso: f"{nation_names[iso]} ({iso})")
+            if young:
+                next(columns).number_input(f"Young: age on {fmt.medium_date(start)} under", min_value=18, max_value=45, step=1, key="w_cutoff")
+            chosen = [t for t in (state.w_types or []) if t != "All"]
+            f = Filters(
+                stage_from=int(state.w_from),
+                stage_to=int(state.w_to),
+                types=[TYPE_VALUES[t] for t in chosen] or None,
+                team=state.w_team if rider_filters else None,
+                nation=state.w_nation if rider_filters else None,
+                cutoff=int(state.w_cutoff),
+            )
+            selected = queries.selected_stages(f)
+            if not selected.empty:
+                extra = " The team and nation filters narrow rider lists while ranks stay race-wide." if rider_filters else ""
+                ui.note(f"{len(selected)} of 21 stages selected ({', '.join(map(str, selected['stage_no']))}). GC is recomputed over them.{extra}")
     if selected.empty:
+        ui.html('<div class="callout">No stage matches these filters. Widen the stage range or pick another stage type.</div>')
         st.stop()
     return f

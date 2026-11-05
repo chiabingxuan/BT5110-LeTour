@@ -1,8 +1,19 @@
 # Task 3 dashboard: UI spec (approved design)
 
-Source: design canvas "LeTour OLAP Dashboard UI" (6 screens). Values shown in the mockup were illustrative only. **Every number must come from SQL views** (`src/sql/views/`). This spec includes fixes agreed after review (marked **[fix]**) and the second round of design notes from the user on 29 Oct 2026 (marked **[update 2]**). Where they conflict, **[update 2]** wins.
+Source: design canvas "LeTour OLAP Dashboard UI" (6 screens). Values shown in the mockup were illustrative only. **Every number must come from SQL views** (`src/sql/views/`). This spec includes fixes agreed after review (marked **[fix]**) the second round of design notes from the user on 29 Oct 2026 (marked **[update 2]**), and teammate feedback from 5 Nov 2026 (listed under **Update 3** below). Where they conflict, the latest wins.
 
 Target implementation: Streamlit multipage app in `src/dashboard/` with Plotly charts. Match the layout, colours and interactions below; exact pixel fidelity is not required.
+
+---
+
+## Update 3: teammate feedback (5 Nov 2026)
+- **Filter bar**: collapsible, and shows only filters that act on the page. Stage filters everywhere; Team and Rider nation on GC and Riders; Young cutoff on Overview and GC.
+- **E1, E10**: riders who left the race can be searched and plotted; their line stops at the exit with an ×. Every point's hover shows the cumulative time.
+- **E4**: "Show all riders" toggle.
+- **E5**: no bar column; Mean gap is enough.
+- **E7**: remove bonuses, penalties or both with a multi-select. A "Movement in and out of the top 10" card shows each replay, the riders around the cut and a stage-by-stage check.
+- **E8**: the country dropdown alone drives the drill-down; the two country tables are not selectable.
+- **E14**: "Total" replaces "Finishes"; Stages and Riders columns removed; the cell drill-down shows them.
 
 ---
 

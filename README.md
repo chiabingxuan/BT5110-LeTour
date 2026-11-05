@@ -135,6 +135,7 @@ python -m pytest tests
 - **Pivotal moment** is the stage with the largest swing in a rider's gap to the GC leader; ties go to the bigger rank change, then the later stage.
 - **Yellow jersey ties** are broken by the lowest sum of stage placings.
 - **Top-10 finishes** count every rider, so two riders from one team on one stage count 2.
+- **After changing SQL views**, every group member must run `python src/init_db.py --views-only`, or the app will not find new columns and functions.
 
 ## Known data notes
 
