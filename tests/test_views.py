@@ -175,3 +175,25 @@ def test_no_rider_missing_results_without_exit(cur):
 def test_kpis(cur):
     assert rows(cur, "SELECT stages, itt_stages, starters, finishers, exits, nations, margin FROM fn_race_kpis()") \
         == [(21, 2, 184, 160, 24, 27, 264)]
+
+
+# ---------- E7 combined replay ----------
+
+def test_no_both_replay_ranks_on_finish_time_alone(cur):
+    assert one(cur, """
+        SELECT COUNT(*) FROM v_gc_final g
+        JOIN (SELECT rider_bib, SUM(finish_time)::float8 AS total FROM stage_results GROUP BY rider_bib) s USING (rider_bib)
+        WHERE g.no_both_time <> s.total
+    """) == 0
+
+
+def test_top10_movement_matches_final_ranks(cur):
+    moved = one(cur, """
+        SELECT COUNT(*) FROM fn_top10_movement('no_both') WHERE stage_no = 21
+    """)
+    assert moved == one(cur, "SELECT COUNT(*) FROM v_gc_final WHERE (gc_rank <= 10) <> (no_both_rank <= 10)")
+
+
+def test_exited_rider_has_gc_rows_until_exit(cur):
+    last = one(cur, "SELECT MAX(stage_no) FROM fn_gc_by_stage() WHERE rider_bib = 106")
+    assert last == 15  # Van Der Poel: DNS at stage 16

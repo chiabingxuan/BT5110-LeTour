@@ -1,7 +1,7 @@
 -- General classification, recomputed over any slice of stages.
 -- A rider is ranked after a stage only with a result on every selected stage up to it.
 
--- E1, E7, E10: GC after each selected stage. p_cf: 'actual' | 'no_bonus' | 'no_penalty'.
+-- E1, E7, E10: GC after each selected stage. p_cf: 'actual' | 'no_bonus' | 'no_penalty' | 'no_both'.
 CREATE OR REPLACE FUNCTION fn_gc_by_stage(p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL, p_cf text DEFAULT 'actual')
 RETURNS TABLE (rider_bib int, stage_no int, seq int, stage_time float8, cum_time float8, gc_rank int, gap float8, prev_rank int, prev_gap float8)
 LANGUAGE sql STABLE AS $$
@@ -10,6 +10,7 @@ LANGUAGE sql STABLE AS $$
             CASE p_cf
                 WHEN 'no_bonus' THEN sr.finish_time + sr.time_penalty
                 WHEN 'no_penalty' THEN sr.finish_time - sr.time_bonus
+                WHEN 'no_both' THEN sr.finish_time
                 ELSE sr.finish_time - sr.time_bonus + sr.time_penalty
             END::float8 AS stage_time
         FROM stage_results sr
@@ -36,13 +37,14 @@ LANGUAGE sql STABLE AS $$
     WINDOW w AS (PARTITION BY r.rider_bib ORDER BY r.seq)
 $$;
 
--- E1, E7: GC after the last selected stage (or after p_after), with the two counterfactual replays.
+-- E1, E7: GC after the last selected stage (or after p_after), with the counterfactual replays.
 -- A rider is ranked only with a result on every selected stage in range.
 CREATE OR REPLACE FUNCTION fn_gc_final(p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL, p_after int DEFAULT NULL)
 RETURNS TABLE (
     rider_bib int, gc_rank int, cum_time float8, gap float8, total_bonus float8, total_penalty float8,
     no_bonus_rank int, no_bonus_time float8, no_bonus_gap float8,
-    no_penalty_rank int, no_penalty_time float8, no_penalty_gap float8
+    no_penalty_rank int, no_penalty_time float8, no_penalty_gap float8,
+    no_both_rank int, no_both_time float8, no_both_gap float8
 )
 LANGUAGE sql STABLE AS $$
     WITH sel AS (
@@ -53,6 +55,7 @@ LANGUAGE sql STABLE AS $$
             SUM(sr.finish_time - sr.time_bonus + sr.time_penalty)::float8 AS actual_time,
             SUM(sr.finish_time + sr.time_penalty)::float8 AS no_bonus_time,
             SUM(sr.finish_time - sr.time_bonus)::float8 AS no_penalty_time,
+            SUM(sr.finish_time)::float8 AS no_both_time,
             SUM(sr.time_bonus)::float8 AS total_bonus,
             SUM(sr.time_penalty)::float8 AS total_penalty
         FROM stage_results sr
@@ -64,7 +67,8 @@ LANGUAGE sql STABLE AS $$
         (RANK() OVER (ORDER BY t.actual_time))::int, t.actual_time, t.actual_time - MIN(t.actual_time) OVER (),
         t.total_bonus, t.total_penalty,
         (RANK() OVER (ORDER BY t.no_bonus_time))::int, t.no_bonus_time, t.no_bonus_time - MIN(t.no_bonus_time) OVER (),
-        (RANK() OVER (ORDER BY t.no_penalty_time))::int, t.no_penalty_time, t.no_penalty_time - MIN(t.no_penalty_time) OVER ()
+        (RANK() OVER (ORDER BY t.no_penalty_time))::int, t.no_penalty_time, t.no_penalty_time - MIN(t.no_penalty_time) OVER (),
+        (RANK() OVER (ORDER BY t.no_both_time))::int, t.no_both_time, t.no_both_time - MIN(t.no_both_time) OVER ()
     FROM totals t
 $$;
 
@@ -128,6 +132,17 @@ LANGUAGE sql STABLE AS $$
     WHERE g.rider_bib = ANY (p_bibs)
       AND g.prev_rank IS NOT NULL
       AND g.prev_rank <> g.gc_rank
+$$;
+
+-- E7: riders whose top-10 membership differs from the actual GC, after each stage, in a counterfactual replay.
+CREATE OR REPLACE FUNCTION fn_top10_movement(p_cf text, p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL)
+RETURNS TABLE (stage_no int, rider_bib int, actual_rank int, replay_rank int, movement text)
+LANGUAGE sql STABLE AS $$
+    SELECT a.stage_no, a.rider_bib, a.gc_rank, r.gc_rank,
+        CASE WHEN r.gc_rank <= 10 THEN 'enters' ELSE 'leaves' END
+    FROM fn_gc_by_stage(p_from, p_to, p_types, 'actual') a
+    JOIN fn_gc_by_stage(p_from, p_to, p_types, p_cf) r ON r.rider_bib = a.rider_bib AND r.seq = a.seq
+    WHERE (a.gc_rank <= 10) <> (r.gc_rank <= 10)
 $$;
 
 -- Race-level KPIs for the selection (Overview tiles).

@@ -58,6 +58,14 @@ def gc_final(f, after=None):
     """, a=after, **_sel(f))
 
 
+def top10_movement(f, cf):
+    return query(f"""
+        SELECT m.*, r.rider_name FROM fn_top10_movement(:cf, {SEL}) m
+        JOIN v_riders r ON r.rider_bib = m.rider_bib
+        ORDER BY m.stage_no, m.movement, m.replay_rank
+    """, cf=cf, **_sel(f))
+
+
 def pivotal(f, after=None):
     return query(f"SELECT * FROM fn_pivotal({SEL}, :a)", a=after, **_sel(f))
 

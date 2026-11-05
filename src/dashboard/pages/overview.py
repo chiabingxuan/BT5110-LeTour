@@ -9,7 +9,7 @@ from lib import format as fmt
 state = st.session_state
 
 ui.header([], "Race overview")
-f = filters.bar()
+f = filters.bar(young=True)
 selected = queries.selected_stages(f)
 final = queries.gc_final(f)
 
@@ -37,10 +37,10 @@ with ui.card("route", "The route, stage by stage", "Bar height = distance · col
 
 
 # ---------- E10 GC storyline ----------
-def add_team_riders(finishers):
+def add_team_riders(pickable):
     team = state.add_team
     if team:
-        add = finishers.loc[finishers["team"] == team, "rider_bib"].tolist()
+        add = pickable.loc[pickable["team"] == team, "rider_bib"].tolist()
         state.w_story = (state.w_story + [b for b in add if b not in state.w_story])[:10]
     state.add_team = None
 
@@ -51,16 +51,21 @@ def reset_story(default):
 
 with ui.card("story", "GC storyline", tag="E10",
              sub="Riders are plotted over the selected stages · shaded = mountain stages · numbered flags = yellow jersey changes"):
-    finishers = final[["rider_bib", "rider_name", "gc_rank", "team"]]
-    top5 = finishers["rider_bib"].head(5).tolist()
-    valid = set(finishers["rider_bib"])
+    # Finishers in GC order, then riders who left the race and so have no final rank
+    top5 = final["rider_bib"].head(5).tolist()
+    in_gc = set(queries.gc_by_stage(f)["rider_bib"])
+    all_riders = queries.riders().set_index("rider_bib")
+    left = sorted((b for b in in_gc if b not in set(final["rider_bib"])), key=lambda b: all_riders.loc[b, "rider_name"])
+    names = dict(zip(final["rider_bib"], final["gc_rank"].astype(str) + ". " + final["rider_name"]))
+    names.update({b: f"{all_riders.loc[b, 'rider_name']} (left at stage {int(all_riders.loc[b, 'exit_stage'])})" for b in left})
+    pickable = all_riders.loc[list(names)].reset_index()
+    valid = set(names)
     state.w_story = [b for b in state.get("w_story", top5) if b in valid] or top5
-    names = dict(zip(finishers["rider_bib"], finishers["gc_rank"].astype(str) + ". " + finishers["rider_name"]))
 
     c1, c2, c3 = st.columns([5, 2, 1.1], vertical_alignment="bottom")
-    c1.multiselect("Riders on the chart (default: GC top 5)", list(names), key="w_story", format_func=names.get, max_selections=10)
+    c1.multiselect("Riders on the chart (default: GC top 5; search any rider, including those who left the race)", list(names), key="w_story", format_func=names.get, max_selections=10)
     c2.selectbox("Add a team's riders", queries.team_names()["name"].tolist(), key="add_team", index=None,
-                 placeholder="Choose team…", on_change=add_team_riders, args=(finishers,))
+                 placeholder="Choose team…", on_change=add_team_riders, args=(pickable,))
     c3.button("Reset to top 5", on_click=reset_story, args=(top5,), width="stretch")
 
     state.setdefault("w_story_view", "GC rank")
@@ -74,16 +79,17 @@ with ui.card("story", "GC storyline", tag="E10",
     inflections = queries.inflections(f, bibs) if bibs else None
     yellow = queries.yellow(f)
     if bibs:
-        st.plotly_chart(charts.gc_lines(gc, selected, bibs, measure, inflections, yellow), width="stretch", config={"displayModeBar": False}, key="story_chart")
+        exits = {b: int(all_riders.loc[b, "exit_stage"]) for b in bibs if b in left}
+        st.plotly_chart(charts.gc_lines(gc, selected, bibs, measure, inflections, yellow, exits=exits), width="stretch", config={"displayModeBar": False}, key="story_chart")
         legend = "".join(
-            f'<span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px"><i style="width:18px;height:3px;background:{charts.RIDER_LINES[i % 10]};display:inline-block"></i>{escape(names[b].split(". ", 1)[1])}</span>'
+            f'<span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px"><i style="width:18px;height:3px;background:{charts.RIDER_LINES[i % 10]};display:inline-block"></i>{escape(all_riders.loc[b, "rider_name"])}</span>'
             for i, b in enumerate(bibs)
         )
         ui.html(f'<div style="font-size:13px">{legend}</div>')
     ui.note(("Overall GC position after each stage, 1 at the top; crossings are reshuffles; ranks below 20 are drawn at 20+."
              if measure == "rank" else
              "Cumulative adjusted time shown as gap to the leader (rider's total − leader's); hover for the full total.")
-            + " ○ = GC rank changed vs the previous stage · large yellow dot = takes the yellow jersey.")
+            + " ○ = GC rank changed vs the previous stage · large yellow dot = takes the yellow jersey · × = left the race.")
 
     left, right = st.columns([1, 2])
     with left:
@@ -95,7 +101,7 @@ with ui.card("story", "GC storyline", tag="E10",
         )
         ties = yellow[yellow["is_tie"]]
         tie_note = "".join(
-            f'<div class="note" style="margin-top:6px">Stage {r.stage_no}: level on time ({escape(r.tied_with)}); sum of stage placings keeps yellow on {escape(r.holder_name)}.</div>'
+            f'<div class="note" style="margin-top:6px">Stage {r.stage_no}: level on time ({escape(r.tied_with)}), so both show GC rank 1. The lower sum of stage placings puts yellow on {escape(r.holder_name)}.</div>'
             for r in ties.itertuples()
         )
         biggest = ""

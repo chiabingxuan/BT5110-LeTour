@@ -31,8 +31,9 @@ def _stage_axis(fig, stages):
             fig.add_vrect(x0=seq - 0.5, x1=seq + 0.5, fillcolor=MOUNTAIN_BAND, line_width=0, layer="below")
 
 
-def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pivots=None, focus=None, height=380):
+def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pivots=None, focus=None, exits=None, height=380):
     """GC storyline (E10) and GC standing (E1). measure: 'rank' or 'time' (gap to the leader).
+    exits maps a bib to its exit stage, for riders who left the race: their line ends in an ×.
     The inverted y axis puts the leader on top in both views."""
     fig = go.Figure()
     _stage_axis(fig, stages)
@@ -43,6 +44,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
         return min(row_rank, RANK_FLOOR) if measure == "rank" else row_gap / 60
 
     positions = {}
+    hover_of = {}  # (bib, stage) -> full hover text, so a marker on top of a line loses nothing
     for i, bib in reversed(list(enumerate(bibs))):
         rows = gc[gc["rider_bib"] == bib].sort_values("seq")
         if rows.empty:
@@ -54,6 +56,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
             for name, stage, seq, rank, gap, cum in zip(
                 rows["rider_name"], rows["stage_no"], rows["seq"], rows["gc_rank"], rows["gap"], rows["cum_time"])
         ]
+        hover_of.update({(bib, stage): text for stage, text in zip(rows["stage_no"], hover)})
         width = 4.5 if bib == focus else (3.2 if i == 0 and focus is None else 2.2)
         fig.add_trace(go.Scatter(
             x=rows["seq"], y=ys, mode="lines", name=rows["rider_name"].iloc[0],
@@ -69,7 +72,8 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
                 if row.rider_bib in positions and row.stage_no in positions[row.rider_bib]:
                     xs.append(stage_of[row.stage_no])
                     ys.append(positions[row.rider_bib][row.stage_no])
-                    text.append(f"{row.rider_name} · Stage {row.stage_no}: GC {row.prev_rank} → {row.gc_rank}")
+                    change = f"GC {row.prev_rank} → {row.gc_rank}" + (" · takes yellow" if row.takes_yellow else "")
+                    text.append(f"{hover_of[(row.rider_bib, row.stage_no)]}<br>{change}")
                     colours.append(RIDER_LINES[bibs.index(row.rider_bib) % len(RIDER_LINES)])
             if xs:
                 fig.add_trace(go.Scatter(
@@ -83,10 +87,19 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
             if row.rider_bib in positions and row.stage_no in positions[row.rider_bib]:
                 fig.add_trace(go.Scatter(
                     x=[stage_of[row.stage_no]], y=[positions[row.rider_bib][row.stage_no]], mode="markers",
-                    hovertext=[f"Pivotal stage {row.stage_no}"], hoverinfo="text",
+                    hovertext=[f"{hover_of[(row.rider_bib, row.stage_no)]}<br><b>Pivotal stage</b>"], hoverinfo="text",
                     marker=dict(symbol="diamond", size=13, color="#15171C",
                                 line=dict(width=2, color=RIDER_LINES[bibs.index(row.rider_bib) % len(RIDER_LINES)])),
                 ))
+
+    for bib, exit_stage in (exits or {}).items():
+        if bib in positions:
+            last = max(positions[bib])
+            fig.add_trace(go.Scatter(
+                x=[stage_of[last]], y=[positions[bib][last]], mode="markers",
+                hovertext=[f"{hover_of[(bib, last)]}<br>Left the race at stage {exit_stage}"], hoverinfo="text",
+                marker=dict(symbol="x", size=11, color=RIDER_LINES[bibs.index(bib) % len(RIDER_LINES)], line=dict(width=1, color="#15171C")),
+            ))
 
     if yellow is not None:
         for row in yellow[yellow["is_change"]].itertuples():
