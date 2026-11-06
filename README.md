@@ -137,27 +137,25 @@ python src/screenshots.py
 
 ## Where each requirement lives
 
-| Requirement | Page and visual |
-|---|---|
-| a. Drill-down | E1 GC standing, E2 Stage in focus, E5 Riders, E8 Nations, E14 Teams cell drill |
-| b. Classification comparison | GC & Classifications › Parallel classifications |
-| c. Aggregate performance | E1 GC leaderboard, E7 counterfactuals, E10 GC storyline, Best team classification on Teams |
-| d. Country participation | Nations › Riders per country, Teams per country |
-| e. Design and presentation | Design system in `docs/task3/ui_spec.md`; one colour per stage type everywhere |
-| E1, E4, E7 | GC & Classifications |
-| E2 | Stages |
-| E14, Best team table | Teams |
-| E5 | Riders |
-| E8 | Nations |
-| E10 | Overview |
-| E11 | Time Trials |
+The dashboard tells one story, from a team manager's point of view: pick **My team** (default UAE Team Emirates XRG) and its **Rivals** (default: the three best other teams in Best Team) in the sidebar, and every chart colours them (ours in a bold accent, rivals in teal, the rest grey). Each section opens with a chart and a one-line takeaway computed from the data; tables sit behind **Show data** or in drill-downs.
+
+| Chapter (page) | Visuals | Requirements and narratives |
+|---|---|---|
+| 1 · Where do we stand (Overview) | Team KPI tiles with change since the previous stage, GC storyline with our riders highlighted, route strip, leaders | E10, c |
+| 2 · Our leader vs the rivals (GC) | Our leader against the rival leaders by stage with the pivotal stage, slope chart of top-10 movement, classification dot plot | E1, E7, E4, a, b, c |
+| 3 · Team strength (Teams) | Best Team gap to the leading team after every stage, top-10 heatmap of team × stage type with drill-down | c (Best team), E14, a |
+| 4 · Where we win and lose (Stages) | Mountain podiums vs mean gap scatter with rider drill-down, stage top 10 as a lollipop and squads bar, time-trial dot strip | E5, E2, E11, a |
+| 5 · Scouting (Nations) | Rider map, riders and teams per country, country drill-down, young prospects outside our team | E8, d, a |
+| Rider profile, Time trials | Detail pages reached from the chapters | a |
+
+Requirement e (design and presentation) is the storyline itself, the team colours and one colour per stage type everywhere.
 
 The group presents E1, E2, E4, E5, E7, E8, E10, E11 and E14, plus E3's Best team table for requirement (c). E3's drill-down, E6, E9, E12, E13 and E15 are built but hidden: set one to `True` in `src/dashboard/lib/features.py` to show it again.
 
 ## Assumptions
 
 - **Points and King of the Mountains are derived.** The schema stores no points, so both come from stage finishing positions, using the scales in `v_points_scale` (`src/sql/views/03_classifications.sql`). This is not the official scoring: the data has no intermediate sprints or categorised climbs. The derived KOM leader matches the official winner (Pogačar). The derived Points leader (Pogačar) does not match the official winner (Milan).
-- **Young rider** defaults to age at race start (5 Jul 2025) under 26, with the cutoff adjustable. The official rule, born on or after 1 Jan 2000, is a switch on the GC page. Only the official rule gives the official podium; the age rule also admits Tobias Johannessen, who places 3rd.
+- **Young rider** defaults to age at race start (5 Jul 2025) under 26, with the cutoff adjustable. The official rule, born on or after 1 Jan 2000, is a switch on chapter 2, Our leader vs the rivals. Only the official rule gives the official podium; the age rule also admits Tobias Johannessen, who places 3rd.
 - **Pivotal moment** is the stage with the largest swing in a rider's gap to the GC leader; ties go to the bigger rank change, then the later stage.
 - **GC ties** are broken by the lower sum of stage placings so far, then the better placing on the latest stage, in every replay as well.
 - **Top-10 finishes** count every rider, so two riders from one team on one stage count 2.

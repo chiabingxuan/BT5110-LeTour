@@ -236,7 +236,7 @@ with left:
             html += row("Best team (top-3 rule)", teams.iloc[0].team, "Sum of 3 fastest per stage", margin, "#15171C", "#15171C")
         ui.html(html)
         ui.note("*Derived from finishing positions, not the official scoring: the data has no intermediate sprints or categorised climbs. See About / Method.")
-        st.page_link(ui.PAGES["gc"], label="Open GC & Classifications →")
+        st.page_link(ui.PAGES["gc"], label="Chapter 2: Our leader vs the rivals →")
 
 with middle:
     with ui.card("mix", "Where the kilometres went"):

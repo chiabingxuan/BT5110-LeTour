@@ -13,12 +13,20 @@ with ui.card("source", "Data source"):
         "and functions in `src/sql/views/`; the app only selects from them."
     )
 
+with ui.card("story", "How the dashboard reads"):
+    st.markdown(
+        "The pages are a story told from a **team manager's** point of view. Choose *My team* and its *Rivals* in the sidebar: "
+        "1 · Where do we stand → 2 · Our leader vs the rivals → 3 · Team strength → 4 · Where we win and lose → 5 · Scouting. "
+        "Our team is drawn in a bold accent, rivals in teal and everyone else in grey; stage types keep their own colours. "
+        "Each section opens with a chart and a one-line takeaway computed from the data. Tables are behind **Show data** or in the drill-downs."
+    )
+
 with ui.card("definitions", "Definitions"):
     st.markdown("""
 - **Adjusted time** = finish time − time bonus + time penalty, per rider per stage. Never stored; computed in `v_stage_results`.
 - **General classification (GC)**: lowest cumulative adjusted time over the selected stages. Only riders with a result on every selected stage are ranked; others show as DNF with their exit stage and reason.
 - **Best team**: for each stage, the 3 fastest adjusted times per team are summed, and totals accumulate over the selected stages. A team needs 3 finishers on every selected stage.
-- **Young rider**: age at race start (first stage date, 5 Jul 2025) under the cutoff, default 26. The official 2025 rule, born on or after 1 Jan 2000, is a switch on the GC page. The two rules disagree for riders born in the second half of 1999: Tobias Johannessen is 3rd under the age rule; the official podium is Lipowitz, Onley, Vauquelin.
+- **Young rider**: age at race start (first stage date, 5 Jul 2025) under the cutoff, default 26. The official 2025 rule, born on or after 1 Jan 2000, is a switch on chapter 2, Our leader vs the rivals. The two rules disagree for riders born in the second half of 1999: Tobias Johannessen is 3rd under the age rule; the official podium is Lipowitz, Onley, Vauquelin.
 - **Mountain proxy**: adjusted time summed over the selected mountain stages only, ranked among riders who finished all of them.
 - **Inflection point (E10)**: a stage where a plotted rider's GC rank differs from the previous selected stage.
 - **Ties in GC**: riders level on cumulative time are separated by the lower sum of stage placings so far, then by the better placing on the latest stage, so no two riders share a rank. After stage 4, Pogačar and Van Der Poel are level on 16:46:00; Van Der Poel is 1st on placings (54 against 92) and keeps yellow, and Pogačar takes it at stage 5.
@@ -53,11 +61,12 @@ with ui.card("notes", "Known data notes"):
 
 with ui.card("map_requirements", "Where each requirement lives"):
     st.dataframe(pd.DataFrame([
-        ("a. Drill-down", "E1 GC, E2 Stages, E5 Riders, E8 Nations, E14 Teams"),
-        ("b. Classification comparison", "GC & Classifications › Parallel classifications"),
-        ("c. Aggregate performance", "E1, E7 GC (riders) · E10 Overview · Best team classification on Teams (teams)"),
-        ("d. Country participation", "Nations › Riders per country, Teams per country"),
-        ("E1, E4, E7", "GC & Classifications"), ("E2", "Stages"), ("E14, Best team table", "Teams"),
-        ("E5", "Riders"), ("E8", "Nations"), ("E10", "Overview"), ("E11", "Time Trials"),
+        ("a. Drill-down", "Ch 2 E1 stage grain · Ch 3 E14 team × type · Ch 4 E5 rider, E2 stage · Ch 5 E8 country"),
+        ("b. Classification comparison", "Ch 2 Our leader vs the rivals › Parallel classifications"),
+        ("c. Aggregate performance", "Ch 1 E10 storyline · Ch 2 E1, E7 (riders) · Ch 3 Best Team stage by stage (teams)"),
+        ("d. Country participation", "Ch 5 Scouting › Riders per country, Teams per country, map"),
+        ("e. Design and presentation", "Team manager storyline, team colours, one colour per stage type"),
+        ("E10", "Ch 1 Where do we stand"), ("E1, E4, E7", "Ch 2 Our leader vs the rivals"), ("E14, Best team", "Ch 3 Team strength"),
+        ("E5, E2, E11", "Ch 4 Where we win and lose"), ("E8", "Ch 5 Scouting"),
         ("E3 drill-down, E6, E9, E12, E13, E15", "Built but hidden; switch on in src/dashboard/lib/features.py"),
     ], columns=["Requirement", "Page and visual"]), hide_index=True, width="stretch")
