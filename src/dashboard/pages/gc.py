@@ -175,7 +175,7 @@ pivots = pivots[pivots["rider_bib"].isin(chart_set)]
 left, right = st.columns([5, 2])
 with left:
     with ui.card("standing", "Overall GC standing after each stage", tag="E1", drill="Drill-down · stage grain",
-                 sub="Ticked riders · GC position, 1 at the top · ◆ = each rider's pivotal stage · shaded = mountain stages"):
+                 sub="Ticked riders · full GC position, 1 at the top, on a log scale so the top places stay readable · ◆ = each rider's pivotal stage · shaded = mountain stages"):
         st.multiselect("Add riders who left the race", left_race, key="w_gc_exited",
                        format_func=lambda b: f"{names[b]} (left at stage {int(all_riders.loc[b, 'exit_stage'])})", placeholder="Search riders who left…")
         st.pills("Rider in focus", chart_set, key="w_focus", format_func=lambda b: names[b], selection_mode="single")

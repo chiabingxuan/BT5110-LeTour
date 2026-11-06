@@ -86,7 +86,7 @@ with ui.card("story", "GC storyline", tag="E10",
             for i, b in enumerate(bibs)
         )
         ui.html(f'<div style="font-size:13px">{legend}</div>')
-    ui.note(("Overall GC position after each stage, 1 at the top; crossings are reshuffles; ranks below 20 are drawn at 20+."
+    ui.note(("Overall GC position after each stage, 1 at the top; crossings are reshuffles; the rank axis is logarithmic, so the top places get the most room."
              if measure == "rank" else
              "Cumulative adjusted time shown as gap to the leader (rider's total − leader's); hover for the full total.")
             + " ○ = GC rank changed vs the previous stage · large yellow dot = takes the yellow jersey · × = left the race.")

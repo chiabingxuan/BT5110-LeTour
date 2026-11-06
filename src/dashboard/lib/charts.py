@@ -1,4 +1,6 @@
 """Plotly charts. Stage-type colours come from ui.TYPE_COLOURS so each type looks the same everywhere."""
+import math
+
 import plotly.graph_objects as go
 
 from lib import format as fmt
@@ -7,7 +9,7 @@ from lib.ui import TYPE_COLOURS, TYPE_LABELS
 RIDER_LINES = ["#D4A200", "#2E5FA8", "#C0392B", "#17866A", "#7A5CC2", "#D9701E", "#2A9DB5", "#8C5A3C", "#5B6170", "#C2408E"]
 MOUNTAIN_BAND = "#F6EBE6"
 FONT = dict(family="Barlow, system-ui, sans-serif", size=13, color="#15171C")
-RANK_FLOOR = 20
+RANK_TICKS = [1, 2, 3, 5, 10, 20, 50, 100, 150]
 
 
 def base_layout(fig, height, **kwargs):
@@ -41,7 +43,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
     stage_of = dict(zip(stages["stage_no"], stages["seq"]))
 
     def y_value(row_rank, row_gap):
-        return min(row_rank, RANK_FLOOR) if measure == "rank" else row_gap / 60
+        return row_rank if measure == "rank" else row_gap / 60
 
     positions = {}
     hover_of = {}  # (bib, stage) -> full hover text, so a marker on top of a line loses nothing
@@ -110,8 +112,15 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
             )
 
     if measure == "rank":
-        fig.update_yaxes(title="GC position", autorange=False, range=[RANK_FLOOR + 0.5, 0.5],
-                         tickvals=[1, 5, 10, 15, 20], ticktext=["1", "5", "10", "15", "20+"],
+        # Every rank is shown. A log scale keeps the fight for the top places readable even when a
+        # plotted rider sits far down the field: 1st to 10th gets about as much room as 10th to 100th.
+        lowest = max((max(v.values()) for v in positions.values()), default=10)
+        ticks = [t for t in RANK_TICKS if t <= max(lowest, 10)]
+        if lowest > ticks[-1] * 1.3:
+            ticks.append(int(lowest))  # label the lowest plotted rank too, e.g. 80 after 50
+        fig.update_yaxes(title="GC position", type="log", autorange=False,
+                         range=[math.log10(max(lowest, 10) * 1.15), math.log10(0.85)],
+                         tickvals=ticks, ticktext=[str(t) for t in ticks],
                          gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
     else:
         top = max((max(v.values()) for v in positions.values()), default=1)
