@@ -4,15 +4,20 @@
 ```text
 BT5110-LeTour/
 ├── data/                        (git-ignored; add the three CSVs)
-├── docs/task3/                  UI spec, OLAP narratives, design mockups
+├── docs/task3/                  UI spec, OLAP narratives, design mockups, app_screenshots/
+├── docs/task4/                  Benchmark results (normalised vs star schema)
 ├── src/
 │   ├── data_loading.ipynb       Original loader, with its checks shown step by step
 │   ├── loading.py               The same loading logic for the command line
 │   ├── init_db.py               Rebuilds the database with one command
+│   ├── benchmark.py             Task 4: times the paired queries on both schemas
+│   ├── screenshots.py           Saves a screenshot of every dashboard page
 │   ├── sql/
 │   │   ├── schema.sql           Normalised tables
 │   │   ├── drop_tables.sql, truncate_tables.sql, drop_analytics.sql
-│   │   └── views/*.sql          All analytics: views and fn_* functions
+│   │   ├── views/*.sql          All analytics: views and fn_* functions
+│   │   ├── star/*.sql           Task 4 star schema (schema "star") and its ETL
+│   │   └── queries/{normalized,star}/  The same four queries on each schema
 │   └── dashboard/
 │       ├── app.py               Streamlit entry point
 │       ├── pages/*.py           One file per page
@@ -93,7 +98,7 @@ exits.csv
 python src/init_db.py
 ```
 
-This creates the database if needed, then rebuilds the tables, loads the CSVs and creates every view. It deletes what is in the `LeTour` tables first. To recreate only the views and keep the data, use `python src/init_db.py --views-only`.
+This creates the database if needed, then rebuilds the tables, loads the CSVs, creates every view and loads the star schema. It deletes what is in the `LeTour` tables first. To recreate only the views and keep the data, use `python src/init_db.py --views-only`.
 
 You don't normally need `--views-only` after a `git pull`: when the dashboard starts, it checks whether the SQL view files changed since they were installed and rebuilds the views itself, without touching the race data.
 
@@ -111,6 +116,23 @@ Run it from the repository root, so that the theme in `.streamlit/config.toml` a
 
 ```bash
 python -m pytest tests
+```
+
+## Task 4: star schema and benchmark
+
+`python src/init_db.py` also builds a star schema in its own PostgreSQL schema, `star`: `fact_results` (one row per rider per stage, with `adjusted_time` stored) and the dimensions `dim_rider`, `dim_team`, `dim_stage`, `dim_country` and `dim_date`. The dashboard does not read it.
+
+```bash
+python src/benchmark.py --runs 200
+```
+
+This checks that each query pair in `src/sql/queries/` returns identical rows, then writes the median planning and execution times from `EXPLAIN (ANALYZE)` to `docs/task4/benchmark.csv` and `docs/task4/benchmark.md`.
+
+To refresh the screenshots in `docs/task3/app_screenshots/`, start the dashboard, then run:
+
+```bash
+playwright install chromium
+python src/screenshots.py
 ```
 
 ## Where each requirement lives
