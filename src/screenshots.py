@@ -14,9 +14,10 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "task3" / "app_screenshots"
+# In storyline order: the five chapters, then the detail pages
 PAGES = [
-    ("1_overview", ""), ("2_gc_classifications", "gc"), ("3_stages", "stages"), ("4_time_trials", "time_trials"),
-    ("5_riders", "riders"), ("6_teams", "teams"), ("7_nations", "nations"), ("8_about", "about"),
+    ("1_where_we_stand", ""), ("2_leader_vs_rivals", "gc"), ("3_team_strength", "teams"), ("4_where_we_win_and_lose", "stages"),
+    ("5_scouting", "nations"), ("6_rider_profile", "riders"), ("7_time_trials", "time_trials"), ("8_about", "about"),
 ]
 WIDTH = 1440
 
