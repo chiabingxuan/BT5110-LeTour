@@ -1,21 +1,75 @@
-"""Stages: E2 stage in focus and E15 the long day. E11 has its own page, Time Trials."""
+"""Chapter 4, Where we win and lose: E5 mountain contours scatter with a rider drill-down, E2 stage in focus
+(top 10 as a lollipop and the squads that filled it, coloured by team), E11 time trials as a dot strip,
+E15 the long day (hidden). The Time trials detail page keeps the full ITT results."""
 from html import escape
 
 import pandas as pd
 import streamlit as st
 
-from lib import charts, features, filters, queries, ui
+from lib import charts, features, filters, queries, team, ui
 from lib import format as fmt
 
 state = st.session_state
 state.setdefault("w_stage", 12)
 
-ui.header(["Stages", f"Stage {state.w_stage}"], "Stage in focus")
+ctx = team.context()
+ui.header(["4 · Where we win and lose"], "Where do we win and lose?")
 f = filters.bar()
 all_stages = queries.stages()
 selected = queries.selected_stages(f)
+all_riders = queries.riders().set_index("rider_bib")
 
-with ui.card("picker", "Choose a stage", "Faded = outside the current filter"):
+# ---------- E5 mountain contours: podiums against mean gap ----------
+contours = queries.contours(f)
+with ui.card("contours", "Who climbs with the best", tag="E5",
+             sub="Riders who finished every selected mountain stage · podiums (rank ≤ 3) against mean gap to the stage winner · up and to the left is best"):
+    if contours.empty:
+        ui.note("No mountain stages or riders match the current filter.")
+    else:
+        ours = contours[contours["team"] == ctx.my].sort_values(["podiums", "mean_gap"], ascending=[False, True])
+        rivals = contours[contours["team"].isin(ctx.rivals)].sort_values(["podiums", "mean_gap"], ascending=[False, True])
+        if ours.empty:
+            ui.takeaway(f"None of our riders finished every selected mountain stage.")
+        else:
+            o = ours.iloc[0]
+            versus = (f"; the best rival climber, {escape(rivals.iloc[0].rider_name)}, has {rivals.iloc[0].podiums} with a mean gap of {fmt.gap(rivals.iloc[0].mean_gap)}"
+                      if not rivals.empty else "")
+            ui.takeaway(f"Our best climber, <b>{escape(o.rider_name)}</b>, took {o.podiums} mountain podium{'s' if o.podiums != 1 else ''} "
+                        f"with a mean gap of {fmt.gap(o.mean_gap) if o.mean_gap else 'zero'}{versus}.")
+        labelled = set(ours["rider_bib"].head(3)) | set(rivals["rider_bib"].head(len(ctx.rivals) + 1)) | set(contours["rider_bib"].head(3))
+        left, right = st.columns([3, 2])
+        with left:
+            st.plotly_chart(charts.contour_scatter(contours, ctx, labelled), width="stretch", config={"displayModeBar": False}, key="contour_chart")
+            ui.html(f"<div>{team.swatches(ctx)}</div>")
+        with right:
+            options = contours["rider_bib"].tolist()
+            if state.get("w_mtn") not in options:
+                state.w_mtn = int(ours.iloc[0].rider_bib) if not ours.empty else int(options[0])
+            with ui.card("mtn", "Mountain stages, one by one", drill="Drill-down · rider"):
+                st.selectbox("Rider", options, key="w_mtn",
+                             format_func=lambda b: f"{all_riders.loc[b, 'rider_name']} · {all_riders.loc[b, 'team']}")
+                c = contours[contours["rider_bib"] == state.w_mtn].iloc[0]
+                daily = queries.rider_results(f, state.w_mtn)
+                daily = daily[daily["type"] == "mountain"]
+                ui.note(f"{c.podiums} podium{'' if c.podiums == 1 else 's'} from {c.stages} mountain stage{'' if c.stages == 1 else 's'} · "
+                        f"mean gap {fmt.gap(c.mean_gap)} · bar = gap to the stage winner, label = finishing rank")
+                st.plotly_chart(charts.v_bars([f"S{n}" for n in daily["stage_no"]], list(daily["gap_to_winner"]), "#B5644A",
+                                              [f"{r} ◆" if r <= 3 else str(r) for r in daily["rank"]], height=190),
+                                width="stretch", config={"displayModeBar": False}, key="mtn_chart")
+                with st.expander("Show data"):
+                    view = pd.DataFrame({
+                        "Stage": "S" + daily["stage_no"].astype(str) + " · " + daily["route"],
+                        "Rank": [f"{r} ◆" if r <= 3 else str(r) for r in daily["rank"]],
+                        "Adj. time": daily["adjusted_time"].map(fmt.hms), "Gap to winner": daily["gap_to_winner"].map(fmt.gap),
+                    }).reset_index(drop=True)
+                    event = ui.table(view, key="t_mtn_daily", right=["Rank", "Adj. time", "Gap to winner"], select="row")
+                    row = ui.new_row(event, "t_mtn_daily")
+                    if row is not None:
+                        state.w_stage = int(daily.iloc[row].stage_no)
+                        st.rerun()
+                    ui.note("◆ = podium. Click a row to open that stage below.")
+
+with ui.card("picker", "Stage in focus: choose a stage", "Colour = stage type · faded = outside the current filter", tag="E2"):
     ui.stage_button_css(all_stages, "pick_", selected=state.w_stage, selected_only_in=set(selected["stage_no"]))
     columns = st.columns(21, gap=None)
     for column, row in zip(columns, all_stages.itertuples()):
@@ -40,14 +94,20 @@ ui.html(f"""
 """)
 
 top = queries.stage_results(state.w_stage, 10)
+ours = top[top["team"] == ctx.my]
+if ours.empty:
+    ui.takeaway(f"None of our riders made the top 10 on stage {stage.stage_no}; {escape(stage.winner_name)} won it.")
+else:
+    best = ours.iloc[0]
+    ui.takeaway(f"We placed {len(ours)} rider{'s' if len(ours) != 1 else ''} in the top 10 on stage {stage.stage_no}; "
+                + (f"<b>{escape(best.rider_name)}</b> won it." if best["rank"] == 1 else
+                   f"best was <b>{escape(best.rider_name)}</b>, {fmt.ordinal(best['rank'])} at {fmt.gap(best.gap_to_winner) if best.gap_to_winner else 'the same time'}."))
 left, right = st.columns([3, 2])
 with left:
-    with ui.card("top10", "Top 10 finishers", tag="E2"):
-        state.setdefault("w_stage_view", "Riders")
-        if not state.w_stage_view:
-            state.w_stage_view = "Riders"
-        st.segmented_control("View", ["Riders", "By team"], key="w_stage_view", label_visibility="collapsed")
-        if state.w_stage_view == "Riders":
+    with ui.card("top10", "Top 10 finishers", tag="E2", sub="Dot = gap to the stage winner, coloured by team · grey = other teams"):
+        rows = pd.DataFrame({"label": [f"{r}. {n}" for r, n in zip(top["rank"], top["rider_name"])], "team": top["team"], "gap": top["gap_to_winner"]})
+        st.plotly_chart(charts.lollipop(rows, ctx), width="stretch", config={"displayModeBar": False}, key="top10_chart")
+        with st.expander("Show data: top 10 table (click a row to open the rider)"):
             view = pd.DataFrame({
                 "#": top["rank"], "Rider": top["rider_name"], "Team": top["team"], "Nat.": top["rider_country"],
                 "Adjusted time": top["adjusted_time"].map(fmt.hms), "Gap": top["gap_to_winner"].map(fmt.gap),
@@ -57,25 +117,30 @@ with left:
             row = ui.new_row(event, "t_stage_top")
             if row is not None:
                 ui.goto("riders", w_rider=int(top.iloc[row].rider_bib))
-            ui.note("Order = finishing rank; riders on the same time keep the order they crossed the line. Click a row to open the rider.")
-        else:
-            grouped = top.groupby("team", sort=False).agg(
-                n=("rider_bib", "count"),
-                riders=("rider_name", lambda s: list(s)), ranks=("rank", lambda s: list(s)),
-            ).reset_index().sort_values("n", ascending=False, kind="stable")
-            view = pd.DataFrame({
-                "Team": grouped["team"], "In top 10": grouped["n"],
-                "Riders (rank)": [", ".join(f"{n} ({r})" for n, r in zip(ns, rs)) for ns, rs in zip(grouped["riders"], grouped["ranks"])],
-            })
-            ui.table(view)
+            ui.note("Order = finishing rank; riders on the same time keep the order they crossed the line.")
 with right:
-    with ui.card("squads", "Which squads filled the top 10", tag="E2"):
+    with ui.card("squads", "Which squads filled the top 10", tag="E2", sub="Riders in the stage top 10 per team"):
         counts = top["team"].value_counts()
-        st.plotly_chart(charts.h_bars(list(counts.index), [int(v) for v in counts.values], "#2E5FA8", height=28 * len(counts) + 20),
+        st.plotly_chart(charts.h_bars(list(counts.index), [int(v) for v in counts.values],
+                                      [ctx.colour(t) if ctx.is_focus(t) else "#9AA0AC" for t in counts.index], height=30 * len(counts) + 20),
                         width="stretch", config={"displayModeBar": False}, key="squads_chart")
 
-ui.html('<div class="callout">Against the clock (E11) has its own page: both time trials, their results and what they did to the GC.</div>')
-st.page_link(ui.PAGES["time_trials"], label="Open Time Trials →")
+# ---------- E11 against the clock ----------
+itts = all_stages[all_stages["type"] == "individual time-trial"]
+with ui.card("itt", "Against the clock", tag="E11",
+             sub=f"{len(itts)} time trials · {itts['dist_km'].sum():.1f} km · every finisher is a dot at their gap to the winner · hover for names"):
+    results = pd.concat([queries.stage_results(n) for n in itts["stage_no"]], ignore_index=True)
+    ours = results[results["team"] == ctx.my].sort_values("rank").groupby("stage_no").head(1).sort_values("stage_no")
+    if ours.empty:
+        ui.takeaway("None of our riders finished a time trial.")
+    else:
+        ui.takeaway("Our best against the clock: " + "; ".join(
+            f"stage {r.stage_no}, <b>{escape(r.rider_name)}</b> {'won' if r.rank == 1 else fmt.ordinal(r.rank) + ' at ' + fmt.gap(r.gap_to_winner)}"
+            for r in ours.itertuples()) + ".")
+    labelled = set(ours["rider_bib"]) | set(results[results["team"].isin(ctx.rivals)].sort_values("rank").groupby("stage_no").head(1)["rider_bib"])
+    st.plotly_chart(charts.itt_strip(results, itts, ctx, labelled), width="stretch", config={"displayModeBar": False}, key="itt_chart")
+    ui.note("Labels = each winner, our best rider and the best rival rider on each time trial (rank in brackets).")
+    st.page_link(ui.PAGES["time_trials"], label="Open the Time trials detail page: full results and what each did to the GC →")
 
 # ---------- E15 the long day (hidden unless switched on in lib/features.py) ----------
 if features.on("E15"):

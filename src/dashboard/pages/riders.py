@@ -1,4 +1,5 @@
-"""Riders: profile and daily trace, E5 mountain contours with drill-down, E6 speed by terrain, E12 consistency, exits."""
+"""Rider profile (detail page): facts, daily trace, E6 speed by terrain and E12 consistency (hidden), exits.
+E5 mountain contours moved to chapter 4, Where we win and lose."""
 from html import escape
 
 import pandas as pd
@@ -14,7 +15,7 @@ state.setdefault("w_rider", 1)
 if state.w_rider not in all_riders.index:
     state.w_rider = 1
 
-ui.header(["Riders", all_riders.loc[state.w_rider, "rider_name"]], "Rider performance")
+ui.header(["Rider profile", all_riders.loc[state.w_rider, "rider_name"]], "Rider profile")
 f = filters.bar(rider_filters=True)
 selected = queries.selected_stages(f)
 final = queries.gc_final(f)
@@ -79,49 +80,6 @@ with ui.card("trace", "Daily trace · stage finishing rank"):
                 ui.goto("stages", w_stage=row.stage_no)
         ui.html("<style>" + "".join(rules) + "</style>")
         ui.note("Gold = stage win" + (" · last line = gap to the stage winner" if mountain_only else "") + " · click a stage to open it.")
-
-# ---------- E5 mountain contours with drill-down ----------
-contours = f.narrow(queries.contours(f))
-left, right = st.columns(2)
-with left:
-    with ui.card("contours", "Mountain contours", tag="E5",
-                 sub="Riders who finished every selected mountain stage · podiums (rank ≤ 3) · mean gap to the stage winner · click a row to drill down"):
-        if contours.empty:
-            ui.note("No mountain stages or riders match the current filter.")
-        else:
-            top = contours.head(12).reset_index(drop=True)
-            view = pd.DataFrame({
-                "Rider": top["rider_name"], "Mtn podiums": top["podiums"], "Mean gap": top["mean_gap"].map(fmt.gap),
-            })
-            event = ui.table(view, key="t_contours", right=["Mean gap"], select="row")
-            row = ui.new_row(event, "t_contours")
-            if row is not None:
-                state._pending = {"w_mtn": int(top.iloc[row].rider_bib), "w_rider": int(top.iloc[row].rider_bib), "w_trace": "Mountain stages only"}
-                st.rerun()
-with right:
-    if not contours.empty:
-        if state.get("w_mtn") not in contours["rider_bib"].tolist():
-            state.w_mtn = int(state.w_rider) if state.w_rider in contours["rider_bib"].tolist() else int(contours.iloc[0].rider_bib)
-        c = contours[contours["rider_bib"] == state.w_mtn].iloc[0]
-        with ui.card("mtn", escape(c.rider_name), drill="Drill-down · mountain stages",
-                     sub=f"{c.podiums} podium{'' if c.podiums == 1 else 's'} from {c.stages} mountain stage{'' if c.stages == 1 else 's'} · mean gap {fmt.gap(c.mean_gap)}"):
-            daily = queries.rider_results(f, state.w_mtn)
-            daily = daily[daily["type"] == "mountain"]
-            st.plotly_chart(charts.v_bars([f"S{n}" for n in daily["stage_no"]], list(daily["gap_to_winner"]), "#B5644A",
-                                          [fmt.gap(g) for g in daily["gap_to_winner"]], height=170),
-                            width="stretch", config={"displayModeBar": False}, key="mtn_chart")
-            view = pd.DataFrame({
-                "Stage": "S" + daily["stage_no"].astype(str) + " · " + daily["route"],
-                "Date": daily["date"].map(fmt.short_date),
-                "Rank": [f"{r} ◆" if r <= 3 else str(r) for r in daily["rank"]],
-                "Adj. time": daily["adjusted_time"].map(fmt.hms),
-                "Gap to winner": daily["gap_to_winner"].map(fmt.gap),
-            }).reset_index(drop=True)
-            event = ui.table(view, key="t_mtn_daily", right=["Rank", "Adj. time", "Gap to winner"], select="row")
-            row = ui.new_row(event, "t_mtn_daily")
-            if row is not None:
-                ui.goto("stages", w_stage=int(daily.iloc[row].stage_no))
-            ui.note("◆ = podium. Click a row to open that stage in Stage in focus.")
 
 # ---------- E6 speed by terrain ----------
 if features.on("E6"):

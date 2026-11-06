@@ -324,3 +324,90 @@ def heatmap(teams, columns, values, ctx, height=None):
     base_layout(fig, height or 24 * len(teams) + 60)
     fig.update_layout(margin=dict(l=8, r=8, t=30, b=8), yaxis_automargin=True)
     return fig
+
+
+def _role_order(df, ctx, team_col="team"):
+    """Draw order: other teams first, then rivals, then my team on top."""
+    return df.assign(_o=df[team_col].map(lambda t: 2 if t == ctx.my else 1 if t in ctx.rivals else 0)).sort_values("_o", kind="stable")
+
+
+def contour_scatter(rows, ctx, labelled, height=400):
+    """E5: mountain podiums (y) against mean gap to the stage winner on mountain stages (x, minutes).
+    Up and to the left is best. labelled: bibs whose name is written next to the dot."""
+    fig = go.Figure()
+    rows = _role_order(rows, ctx)
+    fig.add_trace(go.Scatter(
+        x=rows["mean_gap"] / 60, y=rows["podiums"], mode="markers",
+        marker=dict(size=[13 if t == ctx.my else 11 if t in ctx.rivals else 7 for t in rows["team"]],
+                    color=[ctx.colour(t) for t in rows["team"]], line=dict(width=1, color="#FFFFFF")),
+        hovertext=[f"<b>{n}</b><br>{t}<br>{p} mountain podium{'s' if p != 1 else ''} · mean gap {fmt.gap(g)}"
+                   for n, t, p, g in zip(rows["rider_name"], rows["team"], rows["podiums"], rows["mean_gap"])], hoverinfo="text",
+    ))
+    # Labels on the same podium count alternate above and below the dots so they don't overlap
+    named = rows[rows["rider_bib"].isin(labelled)].sort_values(["podiums", "mean_gap"])
+    for i, r in enumerate(named.itertuples()):
+        nth = int((named["podiums"] == r.podiums).cumsum()[r.Index]) - 1
+        fig.add_annotation(x=r.mean_gap / 60, y=r.podiums, text=r.rider_name.split()[-1], showarrow=True, arrowhead=0, arrowcolor="#C9CDD4",
+                           ax=14 + 22 * (nth // 2), ay=[-18, 18][nth % 2], xanchor="left",
+                           font=dict(size=12, color=ctx.colour(r.team) if ctx.is_focus(r.team) else "#5B6170"))
+    # The axis fits riders with a podium and the labelled riders; the slowest climbers run off the right
+    fit = rows[(rows["podiums"] > 0) | rows["rider_bib"].isin(labelled)]["mean_gap"].max() / 60
+    fig.update_xaxes(range=[-0.3, max(fit * 1.35, 3)])
+    fig.update_xaxes(title="Mean gap to the stage winner on mountain stages (minutes) · closer to the winners ←", ticksuffix="′",
+                     rangemode="tozero", gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
+    fig.update_yaxes(title="Mountain podiums", dtick=1, rangemode="tozero", gridcolor="#EEF0F3", zeroline=False, fixedrange=True)
+    return base_layout(fig, height)
+
+
+def lollipop(rows, ctx, height=None):
+    """E2: a stage's top finishers, gap to the winner as a stem and dot coloured by team. rows: label, team, gap."""
+    fig = go.Figure()
+    labels = list(rows["label"])
+    for r in rows.itertuples():
+        fig.add_trace(go.Scatter(x=[0, r.gap], y=[r.label, r.label], mode="lines", line=dict(color="#D5D8DE", width=3), hoverinfo="skip"))
+    fig.add_trace(go.Scatter(
+        x=rows["gap"], y=rows["label"], mode="markers+text",
+        marker=dict(size=[16 if t == ctx.my else 13 for t in rows["team"]],
+                    color=[ctx.colour(t) if ctx.is_focus(t) else "#9AA0AC" for t in rows["team"]], line=dict(width=1, color="#FFFFFF")),
+        text=[f"  {fmt.gap(g) if g else 'same time'} · {t}" for g, t in zip(rows["gap"], rows["team"])], textposition="middle right",
+        textfont=dict(size=11, color="#5B6170"), hoverinfo="skip", cliponaxis=False,
+    ))
+    peak = max(rows["gap"].max(), 1)
+    fig.update_xaxes(range=[-peak * 0.04, peak * 2.4], visible=False, fixedrange=True)
+    fig.update_yaxes(categoryorder="array", categoryarray=labels[::-1], fixedrange=True)
+    base_layout(fig, height or 30 * len(rows) + 30)
+    fig.update_layout(margin=dict(l=8, r=8, t=8, b=8), yaxis_automargin=True)
+    return fig
+
+
+def itt_strip(results, itts, ctx, labelled, height=None):
+    """E11: one row per time trial, every finisher a dot at their gap to the winner (minutes).
+    Grey = other teams; my team and the rivals in their colours. labelled: bibs whose name is written."""
+    fig = go.Figure()
+    rows_label = {r.stage_no: f"<b>S{r.stage_no}</b> · {r.route}<br><span style='font-size:11px'>{r.dist_km:.1f} km · won by {r.winner_name}</span>"
+                  for r in itts.itertuples()}
+    order = [rows_label[n] for n in itts["stage_no"]]
+    data = _role_order(results, ctx)
+    # A small fixed jitter spreads riders on the same time
+    jitter = (data["rank"] % 7 - 3) * 0.05
+    fig.add_trace(go.Scatter(
+        x=data["gap_to_winner"] / 60, y=[order.index(rows_label[n]) + j for n, j in zip(data["stage_no"], jitter)], mode="markers",
+        marker=dict(size=[12 if t == ctx.my else 10 if t in ctx.rivals else 7 for t in data["team"]],
+                    color=[ctx.colour(t) if ctx.is_focus(t) else "#AEB3BC" for t in data["team"]], line=dict(width=1, color="#FFFFFF")),
+        hovertext=[f"<b>{n}</b> · {t}<br>Stage {s}: {fmt.ordinal(k)} · {fmt.gap(g) if g else 'winner'}"
+                   for n, t, s, k, g in zip(data["rider_name"], data["team"], data["stage_no"], data["rank"], data["gap_to_winner"])],
+        hoverinfo="text",
+    ))
+    named = data[data["rider_bib"].isin(labelled) | (data["rank"] == 1)].sort_values(["stage_no", "rank"])
+    for i, r in enumerate(named.itertuples()):
+        nth = int((named["stage_no"] == r.stage_no).cumsum()[r.Index]) - 1
+        fig.add_annotation(x=r.gap_to_winner / 60, y=order.index(rows_label[r.stage_no]) + (r.rank % 7 - 3) * 0.05,
+                           text=f"{r.rider_name.split()[-1]} ({r.rank})", showarrow=True, arrowhead=0, arrowcolor="#9AA0AC",
+                           ax=18 * (nth // 2), ay=[-30, 30, -50, 50][nth % 4],
+                           font=dict(size=11, color=ctx.colour(r.team) if ctx.is_focus(r.team) else "#15171C"))
+    fig.update_yaxes(tickvals=list(range(len(order))), ticktext=order, range=[len(order) - 0.4, -0.6], fixedrange=True, showgrid=False)
+    fig.update_xaxes(title="Gap to the stage winner (minutes)", ticksuffix="′", rangemode="tozero", gridcolor="#EEF0F3", griddash="dash",
+                     zeroline=False, fixedrange=True)
+    base_layout(fig, height or 140 * len(order) + 70)
+    fig.update_layout(yaxis_automargin=True, margin=dict(l=8, r=12, t=30, b=40))
+    return fig

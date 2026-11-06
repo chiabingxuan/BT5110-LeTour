@@ -13,7 +13,7 @@ itts = all_stages[all_stages["type"] == "individual time-trial"]
 if state.get("w_itt") not in itts["stage_no"].tolist():
     state.w_itt = int(itts["stage_no"].iloc[0])
 
-ui.header(["Time Trials", f"Stage {state.w_itt}"], "Against the clock")
+ui.header(["Time trials", f"Stage {state.w_itt}"], "Against the clock")
 f = filters.bar()
 selected = queries.selected_stages(f)
 
