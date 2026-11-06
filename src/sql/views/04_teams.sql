@@ -35,6 +35,33 @@ LANGUAGE sql STABLE AS $$
     JOIN teams t ON t.name = x.team
 $$;
 
+-- Best Team after each selected stage: cumulative time of each stage's 3 fastest riders, with the rank
+-- and gap to the leading team at that point. A team drops out from the first stage it had under 3 finishers.
+-- Its last stage equals fn_best_team.
+CREATE OR REPLACE FUNCTION fn_best_team_by_stage(p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL)
+RETURNS TABLE (team varchar, stage_no int, seq int, cum_time float8, team_rank int, gap float8)
+LANGUAGE sql STABLE AS $$
+    WITH sel AS (SELECT * FROM fn_stage_selection(p_from, p_to, p_types)),
+    daily AS (
+        SELECT v.team, sel.seq, sel.stage_no, SUM(v.adjusted_time) AS t
+        FROM v_team_stage_riders v
+        JOIN sel ON sel.stage_id = v.stage_id
+        WHERE v.counted AND v.team_finishers >= 3
+        GROUP BY v.team, sel.seq, sel.stage_no
+    ),
+    cum AS (
+        SELECT d.team, d.seq, d.stage_no,
+            SUM(d.t) OVER (PARTITION BY d.team ORDER BY d.seq) AS cum_time,
+            COUNT(*) OVER (PARTITION BY d.team ORDER BY d.seq) AS n
+        FROM daily d
+    )
+    SELECT c.team, c.stage_no, c.seq, c.cum_time,
+        (RANK() OVER (PARTITION BY c.seq ORDER BY c.cum_time))::int,
+        c.cum_time - MIN(c.cum_time) OVER (PARTITION BY c.seq)
+    FROM cum c
+    WHERE c.n = c.seq
+$$;
+
 -- E3 drill: which riders carried the team's counted time.
 CREATE OR REPLACE FUNCTION fn_team_contribution(p_team text, p_from int DEFAULT 1, p_to int DEFAULT 21, p_types text[] DEFAULT NULL)
 RETURNS TABLE (rider_bib int, rider_name varchar, stages_counted int, stages_finished int, counted_time float8, share_pct float8)

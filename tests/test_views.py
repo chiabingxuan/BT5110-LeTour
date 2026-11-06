@@ -98,6 +98,26 @@ def test_best_team_matches_official_winner(cur):
     assert one(cur, "SELECT team FROM v_team_classification WHERE team_rank = 1") == "TEAM VISMA | LEASE A BIKE"
 
 
+def test_best_team_by_stage_ends_at_final_classification(cur):
+    assert one(cur, """
+        SELECT COUNT(*) FROM fn_best_team_by_stage() b
+        FULL JOIN v_team_classification c ON c.team = b.team AND b.stage_no = 21
+        WHERE (b.stage_no = 21 OR b.stage_no IS NULL)
+          AND (b.team IS NULL OR c.team IS NULL OR b.team_rank <> c.team_rank OR abs(b.cum_time - c.total_time) > 0.01)
+    """) == 0
+
+
+def test_best_team_by_stage_cumulates_daily_top_three(cur):
+    # After stage 5, a team's time equals the sum of its 3 fastest riders on each of stages 1 to 5
+    assert one(cur, """
+        SELECT COUNT(*) FROM fn_best_team_by_stage() b
+        JOIN (SELECT team, SUM(adjusted_time) AS t FROM v_team_stage_riders
+              WHERE counted AND stage_no <= 5 GROUP BY team) d USING (team)
+        WHERE b.stage_no = 5 AND abs(b.cum_time - d.t) > 0.01
+    """) == 0
+    assert one(cur, "SELECT COUNT(*) FROM fn_best_team_by_stage() WHERE team_rank = 1 AND gap <> 0") == 0
+
+
 def test_official_young_rule_gives_official_podium(cur):
     podium = rows(cur, """
         SELECT r.rider_name FROM fn_young_gc(1, 21, NULL, NULL, 'official', 26) y JOIN v_riders r USING (rider_bib)

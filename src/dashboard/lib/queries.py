@@ -170,6 +170,10 @@ def best_team(f):
     return query(f"SELECT * FROM fn_best_team({SEL}) ORDER BY team_rank", **_sel(f))
 
 
+def best_team_by_stage(f):
+    return query(f"SELECT * FROM fn_best_team_by_stage({SEL}) ORDER BY seq, team_rank", **_sel(f))
+
+
 def team_contribution(f, team):
     return query(f"""
         SELECT * FROM fn_team_contribution(:team, {SEL}) ORDER BY stages_counted DESC, rider_name
