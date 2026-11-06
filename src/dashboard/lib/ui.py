@@ -65,6 +65,13 @@ h1.page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; f
 .st-key-card_filters { padding: 4px 8px 10px 8px; gap: 2px; }
 .st-key-card_filters .note { padding: 0 16px; }
 
+/* Team pickers in the dark sidebar */
+.st-key-side_team { background: #1E2129; border: 1px solid #2C3039; border-radius: 10px; padding: 10px 12px; }
+.st-key-side_team label p { color: #FFFFFF !important; font-weight: 600; }
+
+/* One-line takeaway under a chart, computed from the data */
+.takeaway { border-left: 4px solid #C2185B; background: #FBEFF4; color: #15171C; padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 15px; font-weight: 600; line-height: 1.4; }
+
 /* Small helpers */
 .bar-track { height: 10px; background: #F0F1F4; border-radius: 4px; overflow: hidden; }
 .bar-track i { display: block; height: 100%; border-radius: 4px; }
@@ -117,6 +124,11 @@ def bike_logo(size=26):
 
 def html(content):
     st.html(content)
+
+
+def takeaway(text):
+    """The one-line insight a chart opens with. text is HTML built from query results, never hard-coded."""
+    st.html(f'<div class="takeaway">{text}</div>')
 
 
 def note(text):

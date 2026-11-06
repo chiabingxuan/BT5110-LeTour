@@ -1,7 +1,7 @@
 """LeTour Analytics: entry point. Run from the repo root with: streamlit run src/dashboard/app.py"""
 import streamlit as st
 
-from lib import db, ui
+from lib import db, team, ui
 
 st.set_page_config(page_title="LeTour Analytics", page_icon="🚴", layout="wide", initial_sidebar_state="expanded")
 
@@ -19,16 +19,18 @@ for key in list(state.keys()):
     if key.startswith("w_"):
         state[key] = state[key]
 
+# The storyline, told from a team manager's point of view, then the detail pages it links to
 ITEMS = [
-    ("overview", "Overview", True),
-    ("gc", "GC & Classifications", False),
-    ("stages", "Stages", False),
-    ("time_trials", "Time Trials", False),
-    ("riders", "Riders", False),
-    ("teams", "Teams", False),
-    ("nations", "Nations", False),
+    ("overview", "1 · Where do we stand", True),
+    ("gc", "2 · Our leader vs the rivals", False),
+    ("teams", "3 · Team strength", False),
+    ("stages", "4 · Where we win and lose", False),
+    ("nations", "5 · Scouting", False),
+    ("riders", "Rider profile", False),
+    ("time_trials", "Time trials", False),
     ("about", "About / Method", False),
 ]
+DETAIL_FROM = "riders"
 pages = {slug: st.Page(ui.PAGES[slug], title=title, url_path=slug, default=default) for slug, title, default in ITEMS}
 current = st.navigation(list(pages.values()), position="hidden")
 
@@ -36,7 +38,12 @@ ui.inject_css()
 
 with st.sidebar:
     st.html(f'<div class="brand"><b>{ui.bike_logo()}LeTour Analytics</b><span>BT5110 · Group 16 · Tour 2025</span></div>')
+    with st.container(key="side_team"):
+        team.sidebar()
+    st.html('<div class="eyebrow" style="color:#9AA0AC;margin-top:6px">The story</div>')
     for slug, title, _ in ITEMS:
+        if slug == DETAIL_FROM:
+            st.html('<div class="eyebrow" style="color:#9AA0AC;margin-top:10px">Details</div>')
         with st.container(key=f"nav_{slug}"):
             st.page_link(pages[slug], label=title, width="stretch")
     st.html("""

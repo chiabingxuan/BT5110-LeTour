@@ -170,6 +170,11 @@ def best_team(f):
     return query(f"SELECT * FROM fn_best_team({SEL}) ORDER BY team_rank", **_sel(f))
 
 
+def best_team_order():
+    """Team names in race-wide Best Team order, for the default rivals."""
+    return query("SELECT team FROM v_team_classification ORDER BY team_rank")["team"].tolist()
+
+
 def best_team_by_stage(f):
     return query(f"SELECT * FROM fn_best_team_by_stage({SEL}) ORDER BY seq, team_rank", **_sel(f))
 

@@ -34,12 +34,20 @@ def _stage_axis(fig, stages):
 
 
 def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pivots=None, focus=None, exits=None, height=380,
-             rank_scale="log"):
+             rank_scale="log", colours=None, bold=(), end_labels=None):
     """GC storyline (E10) and GC standing (E1). measure: 'rank' or 'time' (gap to the leader).
     rank_scale: 'log' or 'linear' spacing of the rank axis.
     exits maps a bib to its exit stage, for riders who left the race: their line ends in an ×.
+    colours maps a bib to its line colour (by team role); bold bibs are drawn thicker;
+    end_labels maps a bib to the label written at the end of its line.
     The inverted y axis puts the leader on top in both views."""
     fig = go.Figure()
+
+    def colour_of(bib):
+        if colours and bib in colours:
+            return colours[bib]
+        return RIDER_LINES[bibs.index(bib) % len(RIDER_LINES)]
+
     _stage_axis(fig, stages)
     seq_label = dict(zip(stages["seq"], stages["route"]))
     stage_of = dict(zip(stages["stage_no"], stages["seq"]))
@@ -61,29 +69,32 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
                 rows["rider_name"], rows["stage_no"], rows["seq"], rows["gc_rank"], rows["gap"], rows["cum_time"])
         ]
         hover_of.update({(bib, stage): text for stage, text in zip(rows["stage_no"], hover)})
-        width = 4.5 if bib == focus else (3.2 if i == 0 and focus is None else 2.2)
+        if colours:
+            width = 4.5 if bib == focus else (3.4 if bib in bold else 1.8)
+        else:
+            width = 4.5 if bib == focus else (3.2 if i == 0 and focus is None else 2.2)
         fig.add_trace(go.Scatter(
             x=rows["seq"], y=ys, mode="lines", name=rows["rider_name"].iloc[0],
-            line=dict(color=RIDER_LINES[i % len(RIDER_LINES)], width=width),
+            line=dict(color=colour_of(bib), width=width),
             hovertext=hover, hoverinfo="text",
         ))
 
     if inflections is not None and not inflections.empty:
         for takes, size in ((False, 9), (True, 15)):
             part = inflections[inflections["takes_yellow"] == takes]
-            xs, ys, text, colours = [], [], [], []
+            xs, ys, text, rings = [], [], [], []
             for row in part.itertuples():
                 if row.rider_bib in positions and row.stage_no in positions[row.rider_bib]:
                     xs.append(stage_of[row.stage_no])
                     ys.append(positions[row.rider_bib][row.stage_no])
                     change = f"GC {row.prev_rank} → {row.gc_rank}" + (" · takes yellow" if row.takes_yellow else "")
                     text.append(f"{hover_of[(row.rider_bib, row.stage_no)]}<br>{change}")
-                    colours.append(RIDER_LINES[bibs.index(row.rider_bib) % len(RIDER_LINES)])
+                    rings.append(colour_of(row.rider_bib))
             if xs:
                 fig.add_trace(go.Scatter(
                     x=xs, y=ys, mode="markers", hovertext=text, hoverinfo="text",
                     marker=dict(size=size, color="#F5C400" if takes else "#FFFFFF",
-                                line=dict(width=2, color="#15171C" if takes else colours)),
+                                line=dict(width=2, color="#15171C" if takes else rings)),
                 ))
 
     if pivots is not None and not pivots.empty:
@@ -93,7 +104,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
                     x=[stage_of[row.stage_no]], y=[positions[row.rider_bib][row.stage_no]], mode="markers",
                     hovertext=[f"{hover_of[(row.rider_bib, row.stage_no)]}<br><b>Pivotal stage</b>"], hoverinfo="text",
                     marker=dict(symbol="diamond", size=13, color="#15171C",
-                                line=dict(width=2, color=RIDER_LINES[bibs.index(row.rider_bib) % len(RIDER_LINES)])),
+                                line=dict(width=2, color=colour_of(row.rider_bib))),
                 ))
 
     for bib, exit_stage in (exits or {}).items():
@@ -102,8 +113,19 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
             fig.add_trace(go.Scatter(
                 x=[stage_of[last]], y=[positions[bib][last]], mode="markers",
                 hovertext=[f"{hover_of[(bib, last)]}<br>Left the race at stage {exit_stage}"], hoverinfo="text",
-                marker=dict(symbol="x", size=11, color=RIDER_LINES[bibs.index(bib) % len(RIDER_LINES)], line=dict(width=1, color="#15171C")),
+                marker=dict(symbol="x", size=11, color=colour_of(bib), line=dict(width=1, color="#15171C")),
             ))
+
+    for bib, label in (end_labels or {}).items():
+        if bib in positions:
+            last = max(positions[bib])
+            y = positions[bib][last]
+            # Annotations on a log axis are placed in log10 units
+            y = math.log10(y) if measure == "rank" and rank_scale == "log" else y
+            fig.add_annotation(x=stage_of[last], y=y, text=label, showarrow=False, xanchor="left", xshift=8,
+                               font=dict(size=12, color=colour_of(bib)))
+    if end_labels:
+        fig.update_xaxes(range=[0.5, len(stages) + 0.5 + max(2.0, len(stages) * 0.16)])
 
     if yellow is not None:
         for row in yellow[yellow["is_change"]].itertuples():
