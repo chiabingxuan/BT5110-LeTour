@@ -55,9 +55,9 @@ with ui.card("map_requirements", "Where each requirement lives"):
     st.dataframe(pd.DataFrame([
         ("a. Drill-down", "E1 GC, E2 Stages, E5 Riders, E8 Nations, E14 Teams"),
         ("b. Classification comparison", "GC & Classifications › Parallel classifications"),
-        ("c. Aggregate performance", "E1, E7 GC (riders) · E10 Overview · Best team leader on Overview (teams)"),
+        ("c. Aggregate performance", "E1, E7 GC (riders) · E10 Overview · Best team classification on Teams (teams)"),
         ("d. Country participation", "Nations › Riders per country, Teams per country"),
-        ("E1, E4, E7", "GC & Classifications"), ("E2", "Stages"), ("E14", "Teams"),
+        ("E1, E4, E7", "GC & Classifications"), ("E2", "Stages"), ("E14, Best team table", "Teams"),
         ("E5", "Riders"), ("E8", "Nations"), ("E10", "Overview"), ("E11", "Time Trials"),
-        ("E3, E6, E9, E12, E13, E15", "Built but hidden; switch on in src/dashboard/lib/features.py"),
+        ("E3 drill-down, E6, E9, E12, E13, E15", "Built but hidden; switch on in src/dashboard/lib/features.py"),
     ], columns=["Requirement", "Page and visual"]), hide_index=True, width="stretch")

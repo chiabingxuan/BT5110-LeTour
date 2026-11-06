@@ -17,16 +17,18 @@ f = filters.bar()
 selected = queries.selected_stages(f)
 best = queries.best_team(f)
 
-# ---------- E3 (hidden unless switched on in lib/features.py) ----------
-if features.on("E3"):
-    if state.get("w_team_sel") not in team_country:
-        state.w_team_sel = best.iloc[0].team if not best.empty else team_list.iloc[0]["name"]
+# ---------- E3: Best team table (requirement c) and its drill-down, each with its own switch ----------
+show_table, show_drill = features.on("Best team"), features.on("E3")
+if show_drill and state.get("w_team_sel") not in team_country:
+    state.w_team_sel = best.iloc[0].team if not best.empty else team_list.iloc[0]["name"]
+# Without the drill-down, the table takes the full row
+left, right = st.columns([3, 2]) if show_drill else (st.container(), None)
 
-    left, right = st.columns([3, 2])
-    # ---------- E3 Best Team ----------
+if show_table:
     with left:
-        with ui.card("best", "Best team classification", tag="E3",
-                     sub="Sum of each stage's 3 fastest riders (adjusted time) · bar = gap to the leading team · click a team to drill down"):
+        click_hint = " · click a team to drill down" if show_drill else ""
+        with ui.card("best", "Best team classification", tag="Req. c · E3",
+                     sub=f"Sum of each stage's 3 fastest riders (adjusted time), accumulated over the selected stages · bar = gap to the leading team{click_hint}"):
             show_all = st.toggle(f"Show all {len(best)} teams", key="w_bt_all") if len(best) > 10 else False
             shown = (best if show_all else best.head(10)).reset_index(drop=True)
             peak = max(shown["gap"].max(), 1) if not shown.empty else 1
@@ -36,15 +38,17 @@ if features.on("E3"):
                 "Time / gap": [fmt.hms(t) if g == 0 else fmt.gap(g) for t, g in zip(shown["total_time"], shown["gap"])],
             })
             leader_style = view.style.apply(lambda c: ["background-color:#FFF3BF;font-weight:700" if i == 0 else "" for i in range(len(c))], subset=["#", "Team"])
-            event = ui.table(view, key="t_best", right=["Time / gap"], select="row", height=40 + 35 * len(view), styler=leader_style,
+            event = ui.table(view, key="t_best", right=["Time / gap"], select="row" if show_drill else None, height=40 + 35 * len(view), styler=leader_style,
                              column_config={"Gap bar": st.column_config.ProgressColumn("Gap to leader", format=" ", min_value=0, max_value=1, color="#7C8291")})
-            row = ui.new_row(event, "t_best")
-            if row is not None:
-                state.w_team_sel = shown.iloc[row].team
-                st.rerun()
+            if show_drill:
+                row = ui.new_row(event, "t_best")
+                if row is not None:
+                    state.w_team_sel = shown.iloc[row].team
+                    st.rerun()
             ui.note(f"A team needs 3 finishers on every selected stage to be ranked{f' ({23 - len(best)} unranked)' if len(best) < 23 else ''}.")
 
-    # ---------- E3 drill-down ----------
+# ---------- E3 drill-down: who carried the time (hidden unless switched on in lib/features.py) ----------
+if show_drill:
     with right:
         team = state.w_team_sel
         depth = queries.squad_depth().set_index("team").loc[team]

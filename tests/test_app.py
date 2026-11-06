@@ -138,9 +138,21 @@ def _has_widget(app, kind, key):
 def test_switches_hide_and_show_narratives(switched_on, request):
     if switched_on:
         request.getfixturevalue("extras_on")
-    checks = [("teams", "toggle", "w_bt_all"), ("riders", "segmented_control", "w_grain")]  # E3, E6
-    for page, kind, key in checks:
-        app = AppTest.from_file(str(DASHBOARD / "app.py"), default_timeout=30)
-        app.switch_page(f"pages/{page}.py")
-        app.run()
-        assert _has_widget(app, kind, key) is switched_on, (page, key)
+    # E6 has a widget of its own; E3's drill-down is the only thing that picks a team to drill into
+    app = AppTest.from_file(str(DASHBOARD / "app.py"), default_timeout=30)
+    app.switch_page("pages/riders.py")
+    app.run()
+    assert _has_widget(app, "segmented_control", "w_grain") is switched_on
+    app = AppTest.from_file(str(DASHBOARD / "app.py"), default_timeout=30)
+    app.switch_page("pages/teams.py")
+    app.run()
+    assert ("w_team_sel" in app.session_state) is switched_on
+
+
+def test_best_team_table_shows_for_requirement_c():
+    """The Best team table stays on even though the rest of E3 is hidden."""
+    app = AppTest.from_file(str(DASHBOARD / "app.py"), default_timeout=30)
+    app.switch_page("pages/teams.py")
+    app.run()
+    assert not app.exception
+    assert _has_widget(app, "toggle", "w_bt_all")

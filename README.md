@@ -119,18 +119,18 @@ python -m pytest tests
 |---|---|
 | a. Drill-down | E1 GC standing, E2 Stage in focus, E5 Riders, E8 Nations, E14 Teams cell drill |
 | b. Classification comparison | GC & Classifications › Parallel classifications |
-| c. Aggregate performance | E1 GC leaderboard, E7 counterfactuals, E10 GC storyline, Best team leader on Overview |
+| c. Aggregate performance | E1 GC leaderboard, E7 counterfactuals, E10 GC storyline, Best team classification on Teams |
 | d. Country participation | Nations › Riders per country, Teams per country |
 | e. Design and presentation | Design system in `docs/task3/ui_spec.md`; one colour per stage type everywhere |
 | E1, E4, E7 | GC & Classifications |
 | E2 | Stages |
-| E14 | Teams |
+| E14, Best team table | Teams |
 | E5 | Riders |
 | E8 | Nations |
 | E10 | Overview |
 | E11 | Time Trials |
 
-The group presents E1, E2, E4, E5, E7, E8, E10, E11 and E14. E3, E6, E9, E12, E13 and E15 are built but hidden: set one to `True` in `src/dashboard/lib/features.py` to show it again.
+The group presents E1, E2, E4, E5, E7, E8, E10, E11 and E14, plus E3's Best team table for requirement (c). E3's drill-down, E6, E9, E12, E13 and E15 are built but hidden: set one to `True` in `src/dashboard/lib/features.py` to show it again.
 
 ## Assumptions
 
