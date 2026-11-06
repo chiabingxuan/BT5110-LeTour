@@ -278,3 +278,49 @@ def rank_dots(rows, height=None):
     fig.update_layout(showlegend=True, legend=dict(orientation="h", y=1.02, yanchor="bottom", x=0), margin=dict(l=8, r=12, t=36, b=40),
                       yaxis_automargin=True)
     return fig
+
+
+def team_gap_lines(rows, stages, ctx, height=380):
+    """Best Team after each stage: gap to the leading team in minutes, leader on top.
+    rows: fn_best_team_by_stage output. Other teams are thin grey lines behind my team and the rivals."""
+    fig = go.Figure()
+    _stage_axis(fig, stages)
+    order = sorted(rows["team"].unique(), key=lambda t: (t == ctx.my, t in ctx.rivals))
+    last_seq = rows["seq"].max()
+    for team_name in order:
+        part = rows[rows["team"] == team_name].sort_values("seq")
+        focus = ctx.is_focus(team_name)
+        fig.add_trace(go.Scatter(
+            x=part["seq"], y=part["gap"] / 60, mode="lines", name=team_name,
+            line=dict(color=ctx.colour(team_name), width=4 if team_name == ctx.my else 2.6 if focus else 1.2),
+            opacity=1 if focus else 0.7,
+            hovertext=[f"<b>{team_name}</b><br>Stage {n}: Best Team {r} · {fmt.gap(g) if g else 'leader'}"
+                       for n, r, g in zip(part["stage_no"], part["team_rank"], part["gap"])], hoverinfo="text",
+        ))
+        end = part[part["seq"] == last_seq]
+        if focus and not end.empty:
+            fig.add_annotation(x=last_seq, y=end.iloc[0].gap / 60, text=f"{int(end.iloc[0].team_rank)}. {team_name}", showarrow=False,
+                               xanchor="left", xshift=8, font=dict(size=12, color=ctx.colour(team_name)))
+    # The axis fits my team and the rivals; teams further behind run off the bottom
+    focus_rows = rows[rows["team"].map(ctx.is_focus)]
+    top = max((focus_rows["gap"].max() if not focus_rows.empty else rows["gap"].max()) * 1.4, 300) / 60
+    fig.update_xaxes(range=[0.5, len(stages) + 0.5 + max(4.0, len(stages) * 0.3)])
+    fig.update_yaxes(title="Minutes behind the leading team", autorange=False, range=[top * 1.05, -top * 0.03],
+                     ticksuffix="′", gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
+    return base_layout(fig, height)
+
+
+def heatmap(teams, columns, values, ctx, height=None):
+    """E14: teams × stage types, each cell the number of top-10 finishes. values: one row per team."""
+    labels = [f'<span style="color:{ctx.colour(t.split(" · ")[0]) if ctx.is_focus(t.split(" · ")[0]) else "#15171C"}">'
+              f'{"<b>" + t + "</b>" if ctx.is_focus(t.split(" · ")[0]) else t}</span>' for t in teams]
+    fig = go.Figure(go.Heatmap(
+        z=values, x=columns, y=teams, colorscale=[[0, "#F7F8FA"], [0.001, "#E4ECF7"], [1, "#2E5FA8"]],
+        texttemplate="%{z}", textfont=dict(size=12), xgap=3, ygap=3, showscale=False,
+        hovertemplate="%{y}<br>%{x}: %{z} top-10 finishes<extra></extra>",
+    ))
+    fig.update_yaxes(autorange="reversed", fixedrange=True, tickvals=teams, ticktext=labels)
+    fig.update_xaxes(side="top", fixedrange=True)
+    base_layout(fig, height or 24 * len(teams) + 60)
+    fig.update_layout(margin=dict(l=8, r=8, t=30, b=8), yaxis_automargin=True)
+    return fig
