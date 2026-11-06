@@ -48,15 +48,21 @@ def _reset_rivals():
     st.session_state.w_rivals = default_rivals(st.session_state.w_my_team)
 
 
-def sidebar():
-    """Draws the My team and Rivals pickers. app.py calls it on every page, so they read like a global setting."""
+def _ensure(teams):
+    """Sets the defaults and drops stale choices. Pages call it too, as tests may run a page without app.py."""
     state = st.session_state
-    teams = queries.team_names()["name"].tolist()
     if state.get("w_my_team") not in teams:
         state.w_my_team = DEFAULT_TEAM if DEFAULT_TEAM in teams else teams[0]
     if "w_rivals" not in state:
         state.w_rivals = default_rivals(state.w_my_team)
     state.w_rivals = [t for t in state.w_rivals if t in teams and t != state.w_my_team]
+
+
+def sidebar():
+    """Draws the My team and Rivals pickers. app.py calls it on every page, so they read like a global setting."""
+    state = st.session_state
+    teams = queries.team_names()["name"].tolist()
+    _ensure(teams)
     st.selectbox("My team", teams, key="w_my_team", on_change=_reset_rivals)
     st.multiselect("Rivals", [t for t in teams if t != state.w_my_team], key="w_rivals", max_selections=5,
                    placeholder="No rivals", help="Default: the three best other teams in the Best Team classification.")
@@ -64,6 +70,8 @@ def sidebar():
 
 def context():
     state = st.session_state
+    if "w_my_team" not in state or "w_rivals" not in state:
+        _ensure(queries.team_names()["name"].tolist())
     return Context(state.w_my_team, tuple(state.w_rivals))
 
 
