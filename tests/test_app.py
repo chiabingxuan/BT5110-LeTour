@@ -104,3 +104,43 @@ def test_app_rebuilds_outdated_views_on_start():
         cursor.execute("SELECT no_both_rank FROM fn_gc_final() LIMIT 1")
         assert init_db.installed_fingerprint(cursor) == init_db.views_fingerprint()
     connection.close()
+
+
+@pytest.fixture
+def extras_on():
+    """Switches every hidden narrative back on for one test, then restores the settings."""
+    from lib import features
+
+    saved = dict(features.EXTRAS)
+    features.EXTRAS.update({name: True for name in features.EXTRAS})
+    yield
+    features.EXTRAS.clear()
+    features.EXTRAS.update(saved)
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_hidden_narratives_still_draw_when_switched_on(page, extras_on):
+    app = AppTest.from_file(str(DASHBOARD / "app.py"), default_timeout=30)
+    app.switch_page(f"pages/{page}.py")
+    app.run()
+    assert not app.exception, [e.value for e in app.exception]
+
+
+def _has_widget(app, kind, key):
+    try:
+        getattr(app, kind)(key=key)
+        return True
+    except KeyError:
+        return False
+
+
+@pytest.mark.parametrize("switched_on", [False, True])
+def test_switches_hide_and_show_narratives(switched_on, request):
+    if switched_on:
+        request.getfixturevalue("extras_on")
+    checks = [("teams", "toggle", "w_bt_all"), ("riders", "segmented_control", "w_grain")]  # E3, E6
+    for page, kind, key in checks:
+        app = AppTest.from_file(str(DASHBOARD / "app.py"), default_timeout=30)
+        app.switch_page(f"pages/{page}.py")
+        app.run()
+        assert _has_widget(app, kind, key) is switched_on, (page, key)

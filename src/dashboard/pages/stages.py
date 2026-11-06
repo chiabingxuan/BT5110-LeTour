@@ -4,7 +4,7 @@ from html import escape
 import pandas as pd
 import streamlit as st
 
-from lib import charts, filters, queries, ui
+from lib import charts, features, filters, queries, ui
 from lib import format as fmt
 
 state = st.session_state
@@ -77,23 +77,25 @@ with right:
 ui.html('<div class="callout">Against the clock (E11) has its own page: both time trials, their results and what they did to the GC.</div>')
 st.page_link(ui.PAGES["time_trials"], label="Open Time Trials →")
 
-longest_first = selected.sort_values(["dist_km", "stage_no"], ascending=[False, True])
-longest = longest_first.iloc[0]
-left, right = st.columns([3, 2])
-with left:
-    with ui.card("longday", "The long day", tag="E15", sub="Selected stages sorted by distance · longest outlined · open any stage with the picker above"):
-        labels = [f"S{r.stage_no} · {r.route}" for r in longest_first.itertuples()]
-        fig = charts.h_bars(labels, list(longest_first["dist_km"]), [ui.TYPE_COLOURS[t] for t in longest_first["type"]],
-                            texts=[f"{d:.1f}" for d in longest_first["dist_km"]], height=26 * len(labels) + 20)
-        fig.update_traces(marker_line_width=[2.5] + [0] * (len(labels) - 1), marker_line_color="#15171C")
-        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="longday_chart")
-with right:
-    with ui.card("spotlight", "Spotlight · longest stage", tag="E15"):
-        ui.html(f"""<div style="display:flex;gap:12px;align-items:center"><span style="width:52px;height:52px;flex:none;border-radius:10px;background:{ui.TYPE_COLOURS[longest.type]};color:{ui.TYPE_FG[longest.type]};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:26px">{longest.stage_no}</span>
-        <span><b style="font-size:17px">{escape(longest.route)}</b><br><span class="note">{longest.type_label} · {fmt.long_date(longest.date)} · {longest.dist_km:.1f} km</span></span></div>""")
-        leaders = queries.stage_results(longest.stage_no, 5)
-        ui.table(pd.DataFrame({
-            "#": leaders["rank"], "Rider": leaders["rider_name"], "Adjusted time": leaders["adjusted_time"].map(fmt.hms),
-            "Gap": leaders["gap_to_winner"].map(fmt.gap),
-        }), right=["Adjusted time", "Gap"])
-        ui.note("Adjusted time includes time bonuses and penalties.")
+# ---------- E15 the long day (hidden unless switched on in lib/features.py) ----------
+if features.on("E15"):
+    longest_first = selected.sort_values(["dist_km", "stage_no"], ascending=[False, True])
+    longest = longest_first.iloc[0]
+    left, right = st.columns([3, 2])
+    with left:
+        with ui.card("longday", "The long day", tag="E15", sub="Selected stages sorted by distance · longest outlined · open any stage with the picker above"):
+            labels = [f"S{r.stage_no} · {r.route}" for r in longest_first.itertuples()]
+            fig = charts.h_bars(labels, list(longest_first["dist_km"]), [ui.TYPE_COLOURS[t] for t in longest_first["type"]],
+                                texts=[f"{d:.1f}" for d in longest_first["dist_km"]], height=26 * len(labels) + 20)
+            fig.update_traces(marker_line_width=[2.5] + [0] * (len(labels) - 1), marker_line_color="#15171C")
+            st.plotly_chart(fig, width="stretch", config={"displayModeBar": False}, key="longday_chart")
+    with right:
+        with ui.card("spotlight", "Spotlight · longest stage", tag="E15"):
+            ui.html(f"""<div style="display:flex;gap:12px;align-items:center"><span style="width:52px;height:52px;flex:none;border-radius:10px;background:{ui.TYPE_COLOURS[longest.type]};color:{ui.TYPE_FG[longest.type]};display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed';font-weight:700;font-size:26px">{longest.stage_no}</span>
+            <span><b style="font-size:17px">{escape(longest.route)}</b><br><span class="note">{longest.type_label} · {fmt.long_date(longest.date)} · {longest.dist_km:.1f} km</span></span></div>""")
+            leaders = queries.stage_results(longest.stage_no, 5)
+            ui.table(pd.DataFrame({
+                "#": leaders["rank"], "Rider": leaders["rider_name"], "Adjusted time": leaders["adjusted_time"].map(fmt.hms),
+                "Gap": leaders["gap_to_winner"].map(fmt.gap),
+            }), right=["Adjusted time", "Gap"])
+            ui.note("Adjusted time includes time bonuses and penalties.")

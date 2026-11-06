@@ -7,6 +7,7 @@ Target implementation: Streamlit multipage app in `src/dashboard/` with Plotly c
 ---
 
 ## Update 3: teammate feedback (5 Nov 2026)
+- **Scope**: the group presents E1, E2, E4, E5, E7, E8, E10, E11 and E14. E3, E6, E9, E12, E13 and E15 stay built but are hidden by default through `src/dashboard/lib/features.py`.
 - **Filter bar**: collapsible, closed only by its arrow, with a summary line below it, and shows only filters that act on the page. Stage filters everywhere; Team and Rider nation on GC and Riders; Young cutoff on Overview and GC.
 - **E1, E10**: riders who left the race can be searched and plotted; their line stops at the exit with an ×. Every point's hover shows the cumulative time.
 - **E4**: columns Rider · Age · Overall GC · Young GC · Mountain GC Proxy · Proxy vs GC (signed, e.g. +3). "Show all riders" toggle. Points and KOM appear through an "Add Points and KOM" switch, which covers requirement b.

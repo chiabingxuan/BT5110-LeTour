@@ -4,7 +4,7 @@ from html import escape
 import pandas as pd
 import streamlit as st
 
-from lib import charts, filters, queries, ui
+from lib import charts, features, filters, queries, ui
 from lib import format as fmt
 
 state = st.session_state
@@ -52,7 +52,8 @@ with right:
             [MAP_CODES.get(iso, iso) for iso in riders_by_country["iso"]], list(riders_by_country["n"]), list(riders_by_country["country_name"]),
         ), width="stretch", config={"displayModeBar": False}, key="map_chart")
 
-left, right = st.columns(2)
+# Without E9, the E8 drill-down takes the full row
+left, right = st.columns(2) if features.on("E9") else (st.container(), None)
 # ---------- E8 country drill-down ----------
 with left:
     code = state.w_country
@@ -70,33 +71,34 @@ with left:
         ui.table(view, styler=styler, height=min(38 + 35 * len(view), 420))
 
 # ---------- E9 national outcomes ----------
-with right:
-    with ui.card("outcomes", "National outcomes", tag="E9", sub="Best GC finish, stage wins and podiums by rider nationality over the selected stages · click a value to see what is behind it"):
-        outcomes = queries.national_outcomes(f).reset_index(drop=True)
-        view = pd.DataFrame({
-            "Nation": outcomes["iso"], "Country": outcomes["country_name"], "Riders": outcomes["riders"],
-            "Best GC": outcomes["best_gc"].map(fmt.rank_or_dash), "Stage wins": outcomes["stage_wins"], "Podiums": outcomes["podiums"],
-        })
-        event = ui.table(view, key="t_outcomes", right=["Best GC"], select="cell", height=min(38 + 35 * len(view), 420))
-        cell = ui.new_cell(event, "t_outcomes")
-        if cell is not None and cell[1] in ("Best GC", "Stage wins", "Podiums"):
-            state.w_outcome = (outcomes.iloc[int(cell[0])].iso, cell[1])
-        chosen = state.get("w_outcome")
-        if not chosen:
-            ui.note("Click a Best GC, Stage wins or Podiums value.")
-        else:
-            iso, column = chosen
-            row = outcomes[outcomes["iso"] == iso].iloc[0]
-            if column == "Best GC":
-                if pd.isna(row.best_gc):
-                    ui.html(f'<div class="callout"><b>{iso}:</b> no rider finished the selection.</div>')
-                else:
-                    ui.html(f'<div class="callout"><b>{iso} · Best GC:</b> {escape(row.best_gc_rider)}, {fmt.ordinal(row.best_gc)}</div>')
-                    if st.button(f"Open {row.best_gc_rider} →", key="open_best"):
-                        ui.goto("riders", w_rider=int(row.best_gc_bib))
+if right is not None:
+    with right:
+        with ui.card("outcomes", "National outcomes", tag="E9", sub="Best GC finish, stage wins and podiums by rider nationality over the selected stages · click a value to see what is behind it"):
+            outcomes = queries.national_outcomes(f).reset_index(drop=True)
+            view = pd.DataFrame({
+                "Nation": outcomes["iso"], "Country": outcomes["country_name"], "Riders": outcomes["riders"],
+                "Best GC": outcomes["best_gc"].map(fmt.rank_or_dash), "Stage wins": outcomes["stage_wins"], "Podiums": outcomes["podiums"],
+            })
+            event = ui.table(view, key="t_outcomes", right=["Best GC"], select="cell", height=min(38 + 35 * len(view), 420))
+            cell = ui.new_cell(event, "t_outcomes")
+            if cell is not None and cell[1] in ("Best GC", "Stage wins", "Podiums"):
+                state.w_outcome = (outcomes.iloc[int(cell[0])].iso, cell[1])
+            chosen = state.get("w_outcome")
+            if not chosen:
+                ui.note("Click a Best GC, Stage wins or Podiums value.")
             else:
-                results = queries.national_results(f, iso, 1 if column == "Stage wins" else 3)
-                ui.html(f'<div class="callout"><b>{iso} · {column} ({len(results)})</b></div>')
-                if not results.empty:
-                    detail = pd.DataFrame({"Stage": "S" + results["stage_no"].astype(str) + " · " + results["route"], "Rider": results["rider_name"], "Rank": results["rank"]})
-                    ui.table(detail, height=min(38 + 35 * len(detail), 280))
+                iso, column = chosen
+                row = outcomes[outcomes["iso"] == iso].iloc[0]
+                if column == "Best GC":
+                    if pd.isna(row.best_gc):
+                        ui.html(f'<div class="callout"><b>{iso}:</b> no rider finished the selection.</div>')
+                    else:
+                        ui.html(f'<div class="callout"><b>{iso} · Best GC:</b> {escape(row.best_gc_rider)}, {fmt.ordinal(row.best_gc)}</div>')
+                        if st.button(f"Open {row.best_gc_rider} →", key="open_best"):
+                            ui.goto("riders", w_rider=int(row.best_gc_bib))
+                else:
+                    results = queries.national_results(f, iso, 1 if column == "Stage wins" else 3)
+                    ui.html(f'<div class="callout"><b>{iso} · {column} ({len(results)})</b></div>')
+                    if not results.empty:
+                        detail = pd.DataFrame({"Stage": "S" + results["stage_no"].astype(str) + " · " + results["route"], "Rider": results["rider_name"], "Rank": results["rank"]})
+                        ui.table(detail, height=min(38 + 35 * len(detail), 280))

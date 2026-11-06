@@ -4,7 +4,7 @@ from html import escape
 import pandas as pd
 import streamlit as st
 
-from lib import charts, filters, queries, ui
+from lib import charts, features, filters, queries, ui
 from lib import format as fmt
 
 state = st.session_state
@@ -124,76 +124,80 @@ with right:
             ui.note("◆ = podium. Click a row to open that stage in Stage in focus.")
 
 # ---------- E6 speed by terrain ----------
-speed = queries.speed_by_type(f)
-medians = dict(speed.groupby("type")["median_speed"].first())
-left, right = st.columns(2)
-with left:
-    with ui.card("speed", "Speed by terrain", tag="E6", sub="Average speed = distance ÷ adjusted time · selected rider or team vs the peloton median"):
-        state.setdefault("w_grain", "Rider")
-        if not state.w_grain:
-            state.w_grain = "Rider"
-        c1, c2 = st.columns([1, 2], vertical_alignment="bottom")
-        c1.segmented_control("Show", ["Rider", "Team"], key="w_grain")
-        if state.w_grain == "Team":
-            teams = queries.team_names()["name"].tolist()
-            if state.get("w_speed_team") not in teams:
-                state.w_speed_team = rider.team
-            c2.selectbox("Team", teams, key="w_speed_team")
-            subject = speed[speed["team"] == state.w_speed_team].groupby("type")["avg_speed"].mean().to_dict()
-            name = state.w_speed_team
-        else:
-            subject = speed[speed["rider_bib"] == state.w_rider].set_index("type")["avg_speed"].to_dict()
-            name = rider.rider_name
-        st.plotly_chart(charts.speed_bars(subject, medians, name), width="stretch", config={"displayModeBar": False}, key="speed_chart")
-        ui.note(f"Coloured = {escape(name)} · grey = peloton median · the axis starts at 25 km/h.")
-with right:
-    with ui.card("gainers", "Biggest gainers when the road turns mountainous", tag="E6",
-                 sub="Gain = (mountain speed ÷ median) − (flat and hilly speed ÷ median)"):
-        state.setdefault("w_gain_view", "Riders")
-        if not state.w_gain_view:
-            state.w_gain_view = "Riders"
-        st.segmented_control("Gainers", ["Riders", "Teams"], key="w_gain_view", label_visibility="collapsed")
-        if state.w_gain_view == "Riders":
-            g = f.narrow(queries.gainers_riders(f).merge(all_riders[["rider_country"]], left_on="rider_bib", right_index=True)).head(10)
-            view = pd.DataFrame({"Rider": g["rider_name"], "Team": g["team"], "Gain": g["gain_pct"].map("{:+.1f}%".format)})
-        else:
-            g = queries.gainers_teams(f).head(10)
-            view = pd.DataFrame({"Team": g["team"], "Gain": g["gain_pct"].map("{:+.1f}%".format)})
-        if view.empty:
-            ui.note("Needs mountain and flat or hilly stages in the filter.")
-        else:
-            ui.table(view, right=["Gain"])
+if features.on("E6"):
+    speed = queries.speed_by_type(f)
+    medians = dict(speed.groupby("type")["median_speed"].first())
+    left, right = st.columns(2)
+    with left:
+        with ui.card("speed", "Speed by terrain", tag="E6", sub="Average speed = distance ÷ adjusted time · selected rider or team vs the peloton median"):
+            state.setdefault("w_grain", "Rider")
+            if not state.w_grain:
+                state.w_grain = "Rider"
+            c1, c2 = st.columns([1, 2], vertical_alignment="bottom")
+            c1.segmented_control("Show", ["Rider", "Team"], key="w_grain")
+            if state.w_grain == "Team":
+                teams = queries.team_names()["name"].tolist()
+                if state.get("w_speed_team") not in teams:
+                    state.w_speed_team = rider.team
+                c2.selectbox("Team", teams, key="w_speed_team")
+                subject = speed[speed["team"] == state.w_speed_team].groupby("type")["avg_speed"].mean().to_dict()
+                name = state.w_speed_team
+            else:
+                subject = speed[speed["rider_bib"] == state.w_rider].set_index("type")["avg_speed"].to_dict()
+                name = rider.rider_name
+            st.plotly_chart(charts.speed_bars(subject, medians, name), width="stretch", config={"displayModeBar": False}, key="speed_chart")
+            ui.note(f"Coloured = {escape(name)} · grey = peloton median · the axis starts at 25 km/h.")
+    with right:
+        with ui.card("gainers", "Biggest gainers when the road turns mountainous", tag="E6",
+                     sub="Gain = (mountain speed ÷ median) − (flat and hilly speed ÷ median)"):
+            state.setdefault("w_gain_view", "Riders")
+            if not state.w_gain_view:
+                state.w_gain_view = "Riders"
+            st.segmented_control("Gainers", ["Riders", "Teams"], key="w_gain_view", label_visibility="collapsed")
+            if state.w_gain_view == "Riders":
+                g = f.narrow(queries.gainers_riders(f).merge(all_riders[["rider_country"]], left_on="rider_bib", right_index=True)).head(10)
+                view = pd.DataFrame({"Rider": g["rider_name"], "Team": g["team"], "Gain": g["gain_pct"].map("{:+.1f}%".format)})
+            else:
+                g = queries.gainers_teams(f).head(10)
+                view = pd.DataFrame({"Team": g["team"], "Gain": g["gain_pct"].map("{:+.1f}%".format)})
+            if view.empty:
+                ui.note("Needs mountain and flat or hilly stages in the filter.")
+            else:
+                ui.table(view, right=["Gain"])
+
 
 # ---------- E12 consistency and exits ----------
-left, right = st.columns([3, 2])
-with left:
-    with ui.card("consistency", "Consistency near the front", tag="E12",
-                 sub="Top-10 stage finishes in the selection · each square is a stage, filled in type colour with the rank"):
-        leaders = f.narrow(queries.top10_riders(f))
-        leaders = leaders.assign(gc=leaders["rider_bib"].map(gc_rank).fillna(999)).sort_values(["finishes", "gc"], ascending=[False, True]).head(10)
-        rows = queries.top10_rows(f, leaders["rider_bib"].tolist()) if not leaders.empty else pd.DataFrame()
-        html = ""
-        for r in leaders.itertuples():
-            ranks = dict(zip(rows.loc[rows["rider_bib"] == r.rider_bib, "stage_no"], rows.loc[rows["rider_bib"] == r.rider_bib, "rank"]))
-            cells = ""
-            for s in selected.itertuples():
-                if s.stage_no in ranks:
-                    cells += (f'<span class="sq" title="Stage {s.stage_no} · {s.type_label} · rank {ranks[s.stage_no]}" '
-                              f'style="background:{ui.TYPE_COLOURS[s.type]};border-color:{ui.TYPE_COLOURS[s.type]};color:{ui.TYPE_FG[s.type]}">{ranks[s.stage_no]}</span>')
-                else:
-                    cells += f'<span class="sq" title="Stage {s.stage_no} · {s.type_label} · outside the top 10"></span>'
-            html += (f'<div class="hrow" style="grid-template-columns:minmax(0,160px) 30px 1fr"><b style="font-size:14px">{escape(r.rider_name)}</b>'
-                     f'<b class="num" style="font-family:\'Barlow Condensed\';font-size:22px">{r.finishes}</b>'
-                     f'<div class="strip" style="grid-template-columns:repeat({len(selected)},minmax(0,1fr))">{cells}</div></div>')
-        ui.html(html or '<div class="note">No top-10 finishes match the current filter.</div>')
-        if not leaders.empty:
-            with st.expander("Contributing stages"):
-                bibs = leaders["rider_bib"].tolist()
-                if state.get("w_cons") not in bibs:
-                    state.w_cons = bibs[0]
-                st.selectbox("Rider", bibs, key="w_cons", format_func=lambda b: all_riders.loc[b, "rider_name"])
-                detail = rows[rows["rider_bib"] == state.w_cons]
-                ui.table(pd.DataFrame({"Stage": detail["stage_no"].map("S{}".format) + " · " + detail["route"], "Type": detail["type_label"], "Rank": detail["rank"]}))
+# Without E12, Race exits takes the full row
+left, right = st.columns([3, 2]) if features.on("E12") else (None, st.container())
+if left is not None:
+    with left:
+        with ui.card("consistency", "Consistency near the front", tag="E12",
+                     sub="Top-10 stage finishes in the selection · each square is a stage, filled in type colour with the rank"):
+            leaders = f.narrow(queries.top10_riders(f))
+            leaders = leaders.assign(gc=leaders["rider_bib"].map(gc_rank).fillna(999)).sort_values(["finishes", "gc"], ascending=[False, True]).head(10)
+            rows = queries.top10_rows(f, leaders["rider_bib"].tolist()) if not leaders.empty else pd.DataFrame()
+            html = ""
+            for r in leaders.itertuples():
+                ranks = dict(zip(rows.loc[rows["rider_bib"] == r.rider_bib, "stage_no"], rows.loc[rows["rider_bib"] == r.rider_bib, "rank"]))
+                cells = ""
+                for s in selected.itertuples():
+                    if s.stage_no in ranks:
+                        cells += (f'<span class="sq" title="Stage {s.stage_no} · {s.type_label} · rank {ranks[s.stage_no]}" '
+                                  f'style="background:{ui.TYPE_COLOURS[s.type]};border-color:{ui.TYPE_COLOURS[s.type]};color:{ui.TYPE_FG[s.type]}">{ranks[s.stage_no]}</span>')
+                    else:
+                        cells += f'<span class="sq" title="Stage {s.stage_no} · {s.type_label} · outside the top 10"></span>'
+                html += (f'<div class="hrow" style="grid-template-columns:minmax(0,160px) 30px 1fr"><b style="font-size:14px">{escape(r.rider_name)}</b>'
+                         f'<b class="num" style="font-family:\'Barlow Condensed\';font-size:22px">{r.finishes}</b>'
+                         f'<div class="strip" style="grid-template-columns:repeat({len(selected)},minmax(0,1fr))">{cells}</div></div>')
+            ui.html(html or '<div class="note">No top-10 finishes match the current filter.</div>')
+            if not leaders.empty:
+                with st.expander("Contributing stages"):
+                    bibs = leaders["rider_bib"].tolist()
+                    if state.get("w_cons") not in bibs:
+                        state.w_cons = bibs[0]
+                    st.selectbox("Rider", bibs, key="w_cons", format_func=lambda b: all_riders.loc[b, "rider_name"])
+                    detail = rows[rows["rider_bib"] == state.w_cons]
+                    ui.table(pd.DataFrame({"Stage": detail["stage_no"].map("S{}".format) + " · " + detail["route"], "Type": detail["type_label"], "Rank": detail["rank"]}))
 with right:
     with ui.card("race_exits", "Race exits"):
         exits = f.narrow(queries.exits())
