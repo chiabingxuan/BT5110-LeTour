@@ -71,8 +71,15 @@ with ui.card("story", "GC storyline", tag="E10",
     state.setdefault("w_story_view", "GC rank")
     if not state.w_story_view:
         state.w_story_view = "GC rank"
-    st.segmented_control("Measure", ["GC rank", "Cumulative time"], key="w_story_view", label_visibility="collapsed")
+    state.setdefault("w_rank_scale", "Log")
+    if not state.w_rank_scale:
+        state.w_rank_scale = "Log"
+    m1, m2 = st.columns([1, 3], vertical_alignment="bottom")
+    m1.segmented_control("Measure", ["GC rank", "Cumulative time"], key="w_story_view", label_visibility="collapsed")
     measure = "rank" if state.w_story_view == "GC rank" else "time"
+    if measure == "rank":
+        m2.segmented_control("Rank axis", ["Log", "Linear"], key="w_rank_scale", label_visibility="collapsed",
+                             help="Log gives the top places the most room; Linear spaces every rank evenly.")
 
     bibs = state.w_story
     gc = queries.gc_by_stage(f, bibs) if bibs else None
@@ -80,13 +87,13 @@ with ui.card("story", "GC storyline", tag="E10",
     yellow = queries.yellow(f)
     if bibs:
         exits = {b: int(all_riders.loc[b, "exit_stage"]) for b in bibs if b in left}
-        st.plotly_chart(charts.gc_lines(gc, selected, bibs, measure, inflections, yellow, exits=exits), width="stretch", config={"displayModeBar": False}, key="story_chart")
+        st.plotly_chart(charts.gc_lines(gc, selected, bibs, measure, inflections, yellow, exits=exits, rank_scale=state.w_rank_scale.lower()), width="stretch", config={"displayModeBar": False}, key="story_chart")
         legend = "".join(
             f'<span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px"><i style="width:18px;height:3px;background:{charts.RIDER_LINES[i % 10]};display:inline-block"></i>{escape(all_riders.loc[b, "rider_name"])}</span>'
             for i, b in enumerate(bibs)
         )
         ui.html(f'<div style="font-size:13px">{legend}</div>')
-    ui.note(("Overall GC position after each stage, 1 at the top; crossings are reshuffles; the rank axis is logarithmic, so the top places get the most room."
+    ui.note(("Overall GC position after each stage, 1 at the top; crossings are reshuffles; " + ("the log rank axis gives the top places the most room." if state.w_rank_scale == "Log" else "the linear rank axis spaces every place evenly.")
              if measure == "rank" else
              "Cumulative adjusted time shown as gap to the leader (rider's total − leader's); hover for the full total.")
             + " ○ = GC rank changed vs the previous stage · large yellow dot = takes the yellow jersey · × = left the race.")

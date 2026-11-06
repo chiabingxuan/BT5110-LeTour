@@ -33,8 +33,10 @@ def _stage_axis(fig, stages):
             fig.add_vrect(x0=seq - 0.5, x1=seq + 0.5, fillcolor=MOUNTAIN_BAND, line_width=0, layer="below")
 
 
-def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pivots=None, focus=None, exits=None, height=380):
+def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pivots=None, focus=None, exits=None, height=380,
+             rank_scale="log"):
     """GC storyline (E10) and GC standing (E1). measure: 'rank' or 'time' (gap to the leader).
+    rank_scale: 'log' or 'linear' spacing of the rank axis.
     exits maps a bib to its exit stage, for riders who left the race: their line ends in an ×.
     The inverted y axis puts the leader on top in both views."""
     fig = go.Figure()
@@ -111,7 +113,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
                 hovertext=f"Stage {row.stage_no}: {row.holder_name} takes yellow",
             )
 
-    if measure == "rank":
+    if measure == "rank" and rank_scale == "log":
         # Every rank is shown. A log scale keeps the fight for the top places readable even when a
         # plotted rider sits far down the field: 1st to 10th gets about as much room as 10th to 100th.
         lowest = max((max(v.values()) for v in positions.values()), default=10)
@@ -120,6 +122,15 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
             ticks.append(int(lowest))  # label the lowest plotted rank too, e.g. 80 after 50
         fig.update_yaxes(title="GC position", type="log", autorange=False,
                          range=[math.log10(max(lowest, 10) * 1.15), math.log10(0.85)],
+                         tickvals=ticks, ticktext=[str(t) for t in ticks],
+                         gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
+    elif measure == "rank":
+        # Evenly spaced ranks, so distance on the chart is distance in the standings
+        lowest = max((max(v.values()) for v in positions.values()), default=10)
+        step = next(s for s in (1, 2, 5, 10, 20, 25, 50) if lowest / s <= 10)
+        ticks = [1] + list(range(step, int(lowest) + 1, step))
+        fig.update_yaxes(title="GC position", type="linear", autorange=False,
+                         range=[max(lowest, 5) + 0.5 + lowest * 0.03, 0.5],
                          tickvals=ticks, ticktext=[str(t) for t in ticks],
                          gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
     else:

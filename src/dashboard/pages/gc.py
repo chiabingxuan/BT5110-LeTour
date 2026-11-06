@@ -175,13 +175,18 @@ pivots = pivots[pivots["rider_bib"].isin(chart_set)]
 left, right = st.columns([5, 2])
 with left:
     with ui.card("standing", "Overall GC standing after each stage", tag="E1", drill="Drill-down · stage grain",
-                 sub="Ticked riders · full GC position, 1 at the top, on a log scale so the top places stay readable · ◆ = each rider's pivotal stage · shaded = mountain stages"):
+                 sub="Ticked riders · full GC position, 1 at the top · Log gives the top places the most room, Linear spaces every place evenly · ◆ = each rider's pivotal stage · shaded = mountain stages"):
         st.multiselect("Add riders who left the race", left_race, key="w_gc_exited",
                        format_func=lambda b: f"{names[b]} (left at stage {int(all_riders.loc[b, 'exit_stage'])})", placeholder="Search riders who left…")
         st.pills("Rider in focus", chart_set, key="w_focus", format_func=lambda b: names[b], selection_mode="single")
         focus = state.w_focus if state.w_focus in chart_set else chart_set[0]
         exit_stages = {b: int(all_riders.loc[b, "exit_stage"]) for b in chart_set if b in left_race}
-        st.plotly_chart(charts.gc_lines(gc, in_range, chart_set, "rank", pivots=pivots, focus=focus, exits=exit_stages, height=340),
+        state.setdefault("w_rank_scale", "Log")
+        if not state.w_rank_scale:
+            state.w_rank_scale = "Log"
+        st.segmented_control("Rank axis", ["Log", "Linear"], key="w_rank_scale")
+        st.plotly_chart(charts.gc_lines(gc, in_range, chart_set, "rank", pivots=pivots, focus=focus, exits=exit_stages, height=340,
+                                        rank_scale=state.w_rank_scale.lower()),
                         width="stretch", config={"displayModeBar": False}, key="standing_chart")
 with right:
     with ui.card("pivotal", "Pivotal moment", drill="Rider in focus"):
