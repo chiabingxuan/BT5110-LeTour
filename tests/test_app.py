@@ -77,3 +77,30 @@ def test_filter_banner_does_not_change_when_a_filter_changes():
         return app.expander[0].label, app.expander[0].proto.expanded
 
     assert banner({}) == banner({"w_types": ["Flat"], "w_from": 3, "w_to": 9})
+
+
+def test_app_rebuilds_outdated_views_on_start():
+    """Teammates pulled new code without re-running init_db, and the GC page crashed on a missing column.
+    The app must notice the SQL changed and rebuild the views itself."""
+    import os
+
+    import psycopg2
+    from dotenv import load_dotenv
+
+    sys.path.insert(0, str(DASHBOARD.parent))
+    import init_db
+
+    load_dotenv(DASHBOARD.parents[1] / ".env")
+    connection = psycopg2.connect(
+        host=os.environ["DB_HOST"], port=os.environ["DB_PORT"], dbname=os.environ["DB_NAME"],
+        user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
+    )
+    with connection, connection.cursor() as cursor:
+        # Simulate a database built from an older version: no combined replay columns, old fingerprint
+        cursor.execute("DROP FUNCTION fn_gc_final(int, int, text[], int) CASCADE")
+        cursor.execute(f"COMMENT ON {init_db.FINGERPRINT_TARGET} IS 'letour-views:outdated'")
+        assert init_db.refresh_views_if_stale(cursor) is True
+        assert init_db.refresh_views_if_stale(cursor) is False
+        cursor.execute("SELECT no_both_rank FROM fn_gc_final() LIMIT 1")
+        assert init_db.installed_fingerprint(cursor) == init_db.views_fingerprint()
+    connection.close()

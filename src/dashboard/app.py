@@ -1,11 +1,14 @@
 """LeTour Analytics: entry point. Run from the repo root with: streamlit run src/dashboard/app.py"""
 import streamlit as st
 
-from lib import ui
+from lib import db, ui
 
 st.set_page_config(page_title="LeTour Analytics", page_icon="🚴", layout="wide", initial_sidebar_state="expanded")
 
 state = st.session_state
+
+# Pulling new code updates the SQL files but not each member's database; this keeps them in step
+db.ensure_current_views()
 
 # Selections passed by ui.goto() from the previous page. Applied before any widget exists.
 for key, value in state.pop("_pending", {}).items():

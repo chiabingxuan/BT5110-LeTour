@@ -1,5 +1,6 @@
 """Database access: one shared engine and cached SELECTs."""
 import os
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -8,6 +9,10 @@ from dotenv import load_dotenv
 from sqlalchemy import URL, create_engine, text
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
+# init_db.py lives in src/; it owns the list of view files and the rebuild logic
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import init_db  # noqa: E402
 
 
 @st.cache_resource
@@ -20,6 +25,21 @@ def engine():
         username=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"],
     ))
+
+
+@st.cache_resource(show_spinner="Updating the database views to match this version of the code…")
+def ensure_current_views():
+    """Runs once per app start: rebuilds the analytics views if the SQL files changed since they were installed."""
+    connection = engine().raw_connection()
+    try:
+        with connection.cursor() as cursor:
+            rebuilt = init_db.refresh_views_if_stale(cursor)
+        connection.commit()
+    finally:
+        connection.close()
+    if rebuilt:
+        query.clear()
+    return rebuilt
 
 
 @st.cache_data(show_spinner=False)

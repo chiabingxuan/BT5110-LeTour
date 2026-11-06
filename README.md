@@ -93,7 +93,9 @@ exits.csv
 python src/init_db.py
 ```
 
-This creates the database if needed, then rebuilds the tables, loads the CSVs and creates every view. It deletes what is in the `LeTour` tables first. After changing only the SQL views, use `python src/init_db.py --views-only`, which keeps the data.
+This creates the database if needed, then rebuilds the tables, loads the CSVs and creates every view. It deletes what is in the `LeTour` tables first. To recreate only the views and keep the data, use `python src/init_db.py --views-only`.
+
+You don't normally need `--views-only` after a `git pull`: when the dashboard starts, it checks whether the SQL view files changed since they were installed and rebuilds the views itself, without touching the race data.
 
 `src/data_loading.ipynb` still works if you want to walk through the cleaning and checks. Run it from `src/`, on empty tables.
 
@@ -135,7 +137,7 @@ python -m pytest tests
 - **Pivotal moment** is the stage with the largest swing in a rider's gap to the GC leader; ties go to the bigger rank change, then the later stage.
 - **GC ties** are broken by the lower sum of stage placings so far, then the better placing on the latest stage, in every replay as well.
 - **Top-10 finishes** count every rider, so two riders from one team on one stage count 2.
-- **After changing SQL views**, every group member must run `python src/init_db.py --views-only`, or the app will not find new columns and functions.
+- **The views keep themselves current.** The app compares a fingerprint of `src/sql/views/` with the one stored in the database and rebuilds the views when they differ.
 
 ## Known data notes
 
