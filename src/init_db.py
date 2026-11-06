@@ -1,7 +1,7 @@
-"""Rebuilds the LeTour database with one command: schema, then data, then analytics views.
+"""Rebuilds the LeTour database with one command: schema, then data, then analytics views, then the star schema.
 
     python src/init_db.py               full rebuild (deletes and reloads everything)
-    python src/init_db.py --views-only  recreate only the analytics views and functions
+    python src/init_db.py --views-only  recreate only the analytics views and functions, and reload the star schema
 """
 import argparse
 import hashlib
@@ -69,6 +69,12 @@ def create_views(cursor):
     cursor.execute(f"COMMENT ON {FINGERPRINT_TARGET} IS %s", (f"letour-views:{views_fingerprint()}",))
 
 
+def create_star(cursor):
+    """Task 4: builds the star schema in its own schema "star" and loads it from the normalised tables."""
+    for path in sorted((SQL_DIR / "star").glob("*.sql")):
+        run_file(cursor, path)
+
+
 def installed_fingerprint(cursor):
     cursor.execute("""
         SELECT obj_description(p.oid, 'pg_proc') FROM pg_proc p
@@ -109,6 +115,7 @@ def main():
             run_file(cursor, SQL_DIR / "schema.sql")
             insert_tables(cursor, tables)
         create_views(cursor)
+        create_star(cursor)
     print("Database ready.")
 
 
