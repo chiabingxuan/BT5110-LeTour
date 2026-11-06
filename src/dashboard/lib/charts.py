@@ -222,3 +222,59 @@ def choropleth(iso3, counts, names):
     base_layout(fig, 320)
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     return fig
+
+
+def slope(rows, left_title, right_title, height=None):
+    """E7: each rider's rank in two GCs, joined by a line. rows: name, colour, left, right, bold.
+    The band marks the top 10; a rider crossing the dashed line enters or leaves it."""
+    fig = go.Figure()
+    worst = max(max(rows["left"]), max(rows["right"]))
+    fig.add_hrect(y0=0.5, y1=10.5, fillcolor="#FBF6E0", line_width=0, layer="below")
+    fig.add_hline(y=10.5, line=dict(color="#B58D00", width=1, dash="dash"))
+    for r in rows.itertuples():
+        moved = (r.left <= 10) != (r.right <= 10)
+        arrow = "" if r.left == r.right else (" ▲" if r.right < r.left else " ▼")
+        fig.add_trace(go.Scatter(
+            x=[0, 1], y=[r.left, r.right], mode="lines+markers+text",
+            line=dict(color=r.colour, width=4 if moved or r.bold else 2),
+            marker=dict(size=9, color=r.colour),
+            text=[f"{r.left}. {r.name}  ", f"  {r.right}. {r.name}{arrow}"], textposition=["middle left", "middle right"],
+            textfont=dict(size=12, color="#15171C" if r.bold or moved else "#5B6170"),
+            hovertext=f"{r.name}: {left_title} {r.left} → {right_title} {r.right}", hoverinfo="text",
+        ))
+    fig.update_xaxes(range=[-0.9, 1.9], tickvals=[0, 1], ticktext=[f"<b>{left_title}</b>", f"<b>{right_title}</b>"],
+                     side="top", showgrid=False, zeroline=False, fixedrange=True)
+    fig.update_yaxes(range=[worst + 0.7, 0.3], visible=False, fixedrange=True)
+    base_layout(fig, height or 24 * worst + 70)
+    fig.update_layout(margin=dict(l=8, r=8, t=36, b=8))
+    return fig
+
+
+def rank_dots(rows, height=None):
+    """E4: one row per rider, a marker for each classification rank on a log axis (1 at the left).
+    rows: label (HTML), gc, young, mountain (None when not ranked)."""
+    fig = go.Figure()
+    labels = list(rows["label"])
+    for r in rows.itertuples():
+        ranks = [v for v in (r.gc, r.young, r.mountain) if v is not None and v == v]
+        if len(ranks) > 1:
+            fig.add_trace(go.Scatter(x=[min(ranks), max(ranks)], y=[r.label, r.label], mode="lines",
+                                     line=dict(color="#D5D8DE", width=6), hoverinfo="skip", showlegend=False))
+    series = [("gc", "Overall GC", "circle", "#15171C", 12), ("young", "Young rider GC", "diamond-open", "#5B6170", 12),
+              ("mountain", "Mountain GC proxy", "triangle-up", TYPE_COLOURS["mountain"], 13)]
+    for column, name, symbol, colour, size in series:
+        part = rows[rows[column].notna()]
+        fig.add_trace(go.Scatter(
+            x=part[column], y=part["label"], mode="markers", name=name,
+            marker=dict(symbol=symbol, size=size, color=colour, line=dict(width=2, color=colour)),
+            hovertemplate="%{y}<br>" + name + ": %{x}<extra></extra>",
+        ))
+    worst = max(rows[["gc", "young", "mountain"]].max(skipna=True).max(), 10)
+    ticks = [t for t in RANK_TICKS if t <= worst * 1.2]
+    fig.update_xaxes(type="log", range=[math.log10(0.8), math.log10(worst * 1.25)], tickvals=ticks, ticktext=[str(t) for t in ticks],
+                     title="Rank (log scale, 1 = best)", gridcolor="#EEF0F3", griddash="dash", fixedrange=True)
+    fig.update_yaxes(categoryorder="array", categoryarray=labels[::-1], fixedrange=True)
+    base_layout(fig, height or 30 * len(rows) + 90)
+    fig.update_layout(showlegend=True, legend=dict(orientation="h", y=1.02, yanchor="bottom", x=0), margin=dict(l=8, r=12, t=36, b=40),
+                      yaxis_automargin=True)
+    return fig

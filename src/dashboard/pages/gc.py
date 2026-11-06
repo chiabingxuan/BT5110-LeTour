@@ -1,15 +1,17 @@
-"""GC & Classifications: E1 leaderboard and stage-grain drill, E7 counterfactuals, E4 + req b parallel classifications."""
+"""Chapter 2, Our leader vs the rivals: E1 GC descent of our leader against the rival leaders with the pivotal
+stage, E7 slope chart of top-10 movement when bonuses and penalties are removed, E4 + req b classification dots."""
 from html import escape
 
 import pandas as pd
 import streamlit as st
 
-from lib import charts, filters, queries, ui
+from lib import charts, filters, queries, team, ui
 from lib import format as fmt
 
 state = st.session_state
+ctx = team.context()
 
-ui.header(["GC & Classifications"], "General classification &amp; jerseys")
+ui.header(["2 · Our leader vs the rivals"], "Our leader vs the rivals")
 f = filters.bar(rider_filters=True, young=True)
 selected = queries.selected_stages(f)
 stage_options = selected["stage_no"].tolist()
@@ -26,6 +28,12 @@ with st.container(key="card_gc_options"):
 
 after = int(state.w_after)
 board = queries.gc_final(f, after)
+all_riders = queries.riders().set_index("rider_bib")
+names = all_riders["rider_name"]
+team_of = all_riders["team"]
+colours = {b: ctx.colour(t) for b, t in team_of.items()}
+mine = set(all_riders.index[team_of == ctx.my])
+in_range = selected[selected["stage_no"] <= after]
 
 SCENARIOS = {
     (False, False): ("actual", "gc_rank", "cum_time", "gap", "Actual"),
@@ -36,163 +44,78 @@ SCENARIOS = {
 removed = state.w_cf_remove or []
 scenario, rank_col, time_col, gap_col, scenario_label = SCENARIOS[("Bonuses" in removed, "Penalties" in removed)]
 
-# ---------- E1 + E7: leaderboard ----------
-top5 = board["rider_bib"].head(5).tolist()
+
+def team_leaders():
+    """Our leader, each rival's leader and the GC leader at this point, in GC order."""
+    ranked = board.sort_values("gc_rank")
+    picks = []
+    for t in (ctx.my, *ctx.rivals):
+        picks += ranked.loc[ranked["team"] == t, "rider_bib"].head(1).tolist()
+    picks += ranked["rider_bib"].head(1).tolist()
+    order = list(ranked["rider_bib"])
+    return sorted(set(picks), key=order.index) or order[:5]
+
+
+# ---------- E1: our leader against the rival leaders, at stage grain ----------
 valid = set(board["rider_bib"])
-compare_set = [b for b in state.get("gc_compare", top5) if b in valid] or top5
-
-replay = f" · <b>replayed {scenario_label}</b>" if scenario != "actual" else ""
-with ui.card("leaderboard", "GC leaderboard", tag="E1 · E7",
-             sub=f"Cumulative adjusted time = Σ(finish − bonus + penalty){replay} · tick riders to compare them in the chart below (default: top 5)"):
-    visible = f.narrow(board).sort_values([rank_col, "rider_bib"])
-    show_all = st.toggle(f"Show all {len(visible)} riders", key="w_gc_all") if len(visible) > 20 else False
-    shown = visible if show_all else visible.head(20)
-
-    # The editor keeps its edits by row position, so each view of the table gets its own key and base selection
-    signature = repr((f, after, scenario, show_all))
-    editor_key = f"gc_editor_{abs(hash(signature))}"
-    base = state.setdefault(f"base_{editor_key}", list(compare_set))
-    table = pd.DataFrame({
-        "Compare": shown["rider_bib"].isin(base),
-        "#": shown[rank_col],
-        "Rider": shown["rider_name"],
-        "Team": shown["team"],
-        "Nat.": shown["rider_country"],
-        "Time": shown[time_col].map(fmt.hms),
-        "Gap": shown[gap_col].map(fmt.gap),
-        "Bonus": shown["total_bonus"].map(fmt.bonus),
-        "Penalty": shown["total_penalty"].map(fmt.penalty),
-        "No-bonus rank": [fmt.rank_move(a, b) for a, b in zip(shown["gc_rank"], shown["no_bonus_rank"])],
-        "No-penalty rank": [fmt.rank_move(a, b) for a, b in zip(shown["gc_rank"], shown["no_penalty_rank"])],
-        "Neither rank": [fmt.rank_move(a, b) for a, b in zip(shown["gc_rank"], shown["no_both_rank"])],
-    }).reset_index(drop=True)
-    edited = st.data_editor(
-        table, key=editor_key, hide_index=True, width="stretch", disabled=[c for c in table.columns if c != "Compare"],
-        column_config={
-            "Compare": st.column_config.CheckboxColumn("Compare", width="small"),
-            "#": st.column_config.NumberColumn("#", width="small"),
-            "Team": st.column_config.TextColumn("Team", width="medium"),
-            "Nat.": st.column_config.TextColumn("Nat.", width="small"),
-            "Bonus": st.column_config.TextColumn("Bonus", width="small"),
-            "Penalty": st.column_config.TextColumn("Penalty", width="small"),
-            "No-bonus rank": st.column_config.TextColumn("No bonus", width="small"),
-            "No-penalty rank": st.column_config.TextColumn("No penalty", width="small"),
-            "Neither rank": st.column_config.TextColumn("Neither", width="small"),
-        },
-        height=min(38 + 35 * len(table), 740),
-    )
-    ticked = shown.reset_index(drop=True).loc[edited["Compare"].values, "rider_bib"].tolist()
-    outside = [b for b in compare_set if b not in set(shown["rider_bib"])]
-    new_compare = [b for b in compare_set if b in ticked] + [b for b in ticked if b not in compare_set] + outside
-    state.gc_compare = new_compare or top5
-    compare_set = state.gc_compare
-
-    exits = queries.exits()
-    ui.note(f"{len(exits)} riders who left the race have no final rank; they show as DNF on the Riders page with their exit stage and reason.")
-
-# ---------- E7: movement in and out of the top 10 ----------
-with ui.card("movement", "Movement in and out of the top 10", tag="E7",
-             sub=f"What each replay does to the top 10, computed for GC after stage {after}"):
-    rider_names = board.set_index("rider_bib")["rider_name"]
-    actual_top = set(board.loc[board["gc_rank"] <= 10, "rider_bib"])
-
-    def movement(label, column):
-        replayed = set(board.loc[board[column] <= 10, "rider_bib"])
-        entered, left = replayed - actual_top, actual_top - replayed
-        if not entered and not left:
-            return f"<b>{label}:</b> nobody enters or leaves the top 10."
-        parts = []
-        if entered:
-            parts.append("enter: " + ", ".join(rider_names[b] for b in entered))
-        if left:
-            parts.append("leave: " + ", ".join(rider_names[b] for b in left))
-        return f"<b>{label}:</b> " + "; ".join(parts) + "."
-
-    ui.html('<div class="callout">' + "<br>".join([
-        movement("Without bonuses", "no_bonus_rank"),
-        movement("Without penalties", "no_penalty_rank"),
-        movement("Without both", "no_both_rank"),
-    ]) + "</div>")
-
-    def status(row):
-        was_in, now_in = row.gc_rank <= 10, row.no_both_rank <= 10
-        if was_in and now_in:
-            return "In"
-        if was_in:
-            return "▼ Leaves"
-        return "▲ Enters" if now_in else "Out"
-
-    around = board[board["gc_rank"].between(8, 13)]
-    left_col, right_col = st.columns([3, 2])
-    with left_col:
-        ui.html('<div class="eyebrow">Around the cut (actual places 8–13)</div>')
-        ui.table(pd.DataFrame({
-            "Rider": around["rider_name"], "Actual": around["gc_rank"], "Bonus": around["total_bonus"].map(fmt.bonus),
-            "Penalty": around["total_penalty"].map(fmt.penalty),
-            "No bonus": [fmt.rank_move(a, b) for a, b in zip(around["gc_rank"], around["no_bonus_rank"])],
-            "No penalty": [fmt.rank_move(a, b) for a, b in zip(around["gc_rank"], around["no_penalty_rank"])],
-            "Neither": [fmt.rank_move(a, b) for a, b in zip(around["gc_rank"], around["no_both_rank"])],
-            "Top 10 without both": [status(r) for r in around.itertuples()],
-        }), moves=["No bonus", "No penalty", "Neither", "Top 10 without both"])
-        ranked = board.sort_values("gc_rank")
-        if len(ranked) > 10:
-            margin = ranked.iloc[10]["cum_time"] - ranked.iloc[9]["cum_time"]
-            ui.note(f"10th to 11th is {fmt.gap(margin).lstrip('+') if margin else 'level on time'}; the largest bonus total of any rider is {fmt.bonus(board['total_bonus'].max()).lstrip('−')}.")
-    with right_col:
-        replay_cf = scenario if scenario != "actual" else "no_both"
-        replay_name = scenario_label if scenario != "actual" else "without bonuses and penalties"
-        moves = queries.top10_movement(f, replay_cf)
-        moves = moves[moves["stage_no"] <= after]
-        ui.html(f'<div class="eyebrow">Stage by stage, {replay_name}</div>')
-        if moves.empty:
-            ui.html(f'<div class="callout">At no stage up to stage {after} does this replay change who is in the top 10.</div>')
-        else:
-            grouped = moves.groupby("stage_no").apply(lambda g: pd.Series({
-                "Enters": ", ".join(g.loc[g["movement"] == "enters", "rider_name"]) or "—",
-                "Leaves": ", ".join(g.loc[g["movement"] == "leaves", "rider_name"]) or "—",
-            }), include_groups=False).reset_index().rename(columns={"stage_no": "Stage"})
-            ui.table(grouped)
-
-# ---------- E1: stage-grain drill ----------
-all_riders = queries.riders().set_index("rider_bib")
-names = all_riders["rider_name"]
-in_range = selected[selected["stage_no"] <= after]
-
-# Riders with stage results in range but no rank at this point, because they left the race
+leaders = team_leaders()
 everyone = queries.gc_by_stage(f)
 left_race = sorted(set(everyone.loc[everyone["stage_no"] <= after, "rider_bib"]) - valid, key=lambda b: names[b])
+state.w_gc_compare = [b for b in state.get("w_gc_compare", leaders) if b in valid] or leaders
 state.w_gc_exited = [b for b in state.get("w_gc_exited", []) if b in left_race]
-chart_set = compare_set + state.w_gc_exited
-
+chart_set = state.w_gc_compare + state.w_gc_exited
+our_leader = next((b for b in leaders if b in mine), None)
 if state.get("w_focus") not in chart_set:
-    state.w_focus = chart_set[1] if len(chart_set) > 1 else chart_set[0]
+    state.w_focus = our_leader if our_leader in chart_set else chart_set[0]
 
 gc = queries.gc_by_stage(f, chart_set)
 gc = gc[gc["stage_no"] <= after]
 pivots = queries.pivotal(f, after)
 pivots = pivots[pivots["rider_bib"].isin(chart_set)]
+ranked = board.set_index("rider_bib")
+
+# Takeaway: our leader's place, and the closest rival leader
+if our_leader is not None:
+    me = ranked.loc[our_leader]
+    where = "leads the race" if me.gc_rank == 1 else f"is {fmt.ordinal(me.gc_rank)}, {fmt.gap(me.gap)} behind the leader"
+    rival_rows = board[board["team"].isin(ctx.rivals)].sort_values("gc_rank")
+    rival = ""
+    if not rival_rows.empty:
+        r = rival_rows.iloc[0]
+        diff = r.cum_time - me.cum_time
+        rival = (f"; the best rival, {escape(r.rider_name)} ({escape(r.team)}), is {fmt.ordinal(r.gc_rank)}, "
+                 f"{fmt.gap(abs(diff)).lstrip('+')} {'behind us' if diff > 0 else 'ahead of us'}")
+    ui.takeaway(f"After stage {after}, our leader <b>{escape(me.rider_name)}</b> {where}{rival}.")
+else:
+    ui.takeaway(f"After stage {after}, none of our riders is still ranked in GC.")
 
 left, right = st.columns([5, 2])
 with left:
-    with ui.card("standing", "Overall GC standing after each stage", tag="E1", drill="Drill-down · stage grain",
-                 sub="Ticked riders · full GC position, 1 at the top · Log gives the top places the most room, Linear spaces every place evenly · ◆ = each rider's pivotal stage · shaded = mountain stages"):
-        st.multiselect("Add riders who left the race", left_race, key="w_gc_exited",
+    with ui.card("standing", "Our leader against the rival leaders", tag="E1", drill="Drill-down · stage grain",
+                 sub="Overall GC position after each stage, 1 at the top · line colour = team · ◆ = each rider's pivotal stage · shaded = mountain stages"):
+        c1, c2 = st.columns([3, 2])
+        c1.multiselect("Riders on the chart (default: each team's leader and the GC leader)", list(board["rider_bib"]), key="w_gc_compare",
+                       format_func=lambda b: f"{ranked.loc[b, 'gc_rank']}. {names[b]} · {team_of[b]}", max_selections=10)
+        c2.multiselect("Add riders who left the race", left_race, key="w_gc_exited",
                        format_func=lambda b: f"{names[b]} (left at stage {int(all_riders.loc[b, 'exit_stage'])})", placeholder="Search riders who left…")
-        st.pills("Rider in focus", chart_set, key="w_focus", format_func=lambda b: names[b], selection_mode="single")
+        p1, p2 = st.columns([4, 1], vertical_alignment="bottom")
+        p1.pills("Rider in focus", chart_set, key="w_focus", format_func=lambda b: names[b], selection_mode="single")
         focus = state.w_focus if state.w_focus in chart_set else chart_set[0]
-        exit_stages = {b: int(all_riders.loc[b, "exit_stage"]) for b in chart_set if b in left_race}
         state.setdefault("w_rank_scale", "Log")
         if not state.w_rank_scale:
             state.w_rank_scale = "Log"
-        st.segmented_control("Rank axis", ["Log", "Linear"], key="w_rank_scale")
-        st.plotly_chart(charts.gc_lines(gc, in_range, chart_set, "rank", pivots=pivots, focus=focus, exits=exit_stages, height=340,
-                                        rank_scale=state.w_rank_scale.lower()),
+        p2.segmented_control("Rank axis", ["Log", "Linear"], key="w_rank_scale")
+        exit_stages = {b: int(all_riders.loc[b, "exit_stage"]) for b in chart_set if b in left_race}
+        labels = {b: names[b].split()[-1] for b in chart_set}
+        st.plotly_chart(charts.gc_lines(gc, in_range, chart_set, "rank", pivots=pivots, focus=focus, exits=exit_stages, height=360,
+                                        rank_scale=state.w_rank_scale.lower(), colours=colours, bold=mine, end_labels=labels),
                         width="stretch", config={"displayModeBar": False}, key="standing_chart")
+        ui.html(f"<div>{team.swatches(ctx)}</div>")
 with right:
     with ui.card("pivotal", "Pivotal moment", drill="Rider in focus"):
         rider = all_riders.loc[focus]
-        standing = f"GC {fmt.ordinal(board.loc[board['rider_bib'] == focus, 'gc_rank'].iloc[0])}" if focus in valid else f"DNF – stage {int(rider.exit_stage)} ({rider.exit_reason})"
-        ui.html(f'<div class="big">{escape(rider.rider_name)}</div><div class="note">{escape(rider.team)} · {rider.rider_country} · {standing}</div>')
+        standing = f"GC {fmt.ordinal(ranked.loc[focus, 'gc_rank'])}" if focus in valid else f"DNF – stage {int(rider.exit_stage)} ({rider.exit_reason})"
+        ui.html(f'<div class="big">{escape(rider.rider_name)}</div><div class="note">{ctx.label(rider.team)} · {rider.rider_country} · {standing}</div>')
         row = pivots[pivots["rider_bib"] == focus]
         if row.empty:
             ui.note("Needs at least two stages in the selection.")
@@ -211,9 +134,77 @@ with right:
         if st.button("Open full rider profile →", key="open_profile"):
             ui.goto("riders", w_rider=int(focus))
 
-# ---------- Req b + E4: parallel classifications ----------
+with st.expander("Show data: full GC leaderboard"):
+    visible = f.narrow(board).sort_values([rank_col, "rider_bib"])
+    show_all = st.toggle(f"Show all {len(visible)} riders", key="w_gc_all") if len(visible) > 20 else False
+    shown = visible if show_all else visible.head(20)
+    if scenario != "actual":
+        ui.note(f"Ranks and times replayed {scenario_label}.")
+    table = pd.DataFrame({
+        "#": shown[rank_col], "Rider": shown["rider_name"], "Team": shown["team"], "Nat.": shown["rider_country"],
+        "Time": shown[time_col].map(fmt.hms), "Gap": shown[gap_col].map(fmt.gap),
+        "Bonus": shown["total_bonus"].map(fmt.bonus), "Penalty": shown["total_penalty"].map(fmt.penalty),
+        "No bonus": [fmt.rank_move(a, b) for a, b in zip(shown["gc_rank"], shown["no_bonus_rank"])],
+        "No penalty": [fmt.rank_move(a, b) for a, b in zip(shown["gc_rank"], shown["no_penalty_rank"])],
+        "Neither": [fmt.rank_move(a, b) for a, b in zip(shown["gc_rank"], shown["no_both_rank"])],
+    }).reset_index(drop=True)
+    ours = table.style.apply(lambda c: [f"color:{team.MY};font-weight:700" if t == ctx.my else "" for t in table["Team"]], subset=["Rider", "Team"])
+    ui.table(table, right=["Time", "Gap", "Bonus", "Penalty"], moves=["No bonus", "No penalty", "Neither"], styler=ours,
+             height=min(40 + 35 * len(table), 740))
+    ui.note(f"{len(queries.exits())} riders who left the race have no final rank; they show as DNF on the Rider profile page.")
+
+# ---------- E7: slope chart of the top 10, actual against the replay ----------
+replay_cf = scenario if scenario != "actual" else "no_both"
+replay_rank = rank_col if scenario != "actual" else "no_both_rank"
+replay_name = scenario_label if scenario != "actual" else "without bonuses and penalties"
+with ui.card("movement", "Who moves in and out of the top 10", tag="E7",
+             sub=f"GC after stage {after}: actual places (left) against the replay {replay_name} (right) · choose what to remove at the top of the page"):
+    near = board[(board["gc_rank"] <= 13) | (board[replay_rank] <= 13)].sort_values("gc_rank")
+    rows = pd.DataFrame({
+        "name": near["rider_name"], "colour": [ctx.colour(t) for t in near["team"]],
+        "left": near["gc_rank"].astype(int), "right": near[replay_rank].astype(int), "bold": near["team"] == ctx.my,
+    })
+    entered = near[(near["gc_rank"] > 10) & (near[replay_rank] <= 10)]
+    left_top = near[(near["gc_rank"] <= 10) & (near[replay_rank] > 10)]
+    if entered.empty and left_top.empty:
+        biggest = near.assign(move=(near["gc_rank"] - near[replay_rank]).abs()).sort_values("move", ascending=False).iloc[0]
+        moved = (f"; the biggest move is {escape(biggest.rider_name)}, {int(biggest.gc_rank)} → {int(biggest[replay_rank])}"
+                 if biggest.move else "; no rider near the cut changes place")
+        ui.takeaway(f"Removing {replay_name.removeprefix('without ')} changes nobody in the top 10 after stage {after}{moved}.")
+    else:
+        parts = []
+        if not entered.empty:
+            parts.append(", ".join(escape(n) for n in entered["rider_name"]) + " would enter")
+        if not left_top.empty:
+            parts.append(", ".join(escape(n) for n in left_top["rider_name"]) + " would drop out")
+        ui.takeaway(f"Without {replay_name.removeprefix('without ')}, " + " and ".join(parts) + f" of the top 10 after stage {after}.")
+    st.plotly_chart(charts.slope(rows, "Actual", "Replay"), width="stretch", config={"displayModeBar": False}, key="slope_chart")
+    ui.note("Shaded = top 10 · thick lines = our riders and anyone crossing the dashed cut · ▲▼ = places gained or lost in the replay.")
+
+    with st.expander("Show data: around the cut, and stage by stage"):
+        around = board[board["gc_rank"].between(8, 13)]
+        ui.table(pd.DataFrame({
+            "Rider": around["rider_name"], "Actual": around["gc_rank"], "Bonus": around["total_bonus"].map(fmt.bonus),
+            "Penalty": around["total_penalty"].map(fmt.penalty),
+            "No bonus": [fmt.rank_move(a, b) for a, b in zip(around["gc_rank"], around["no_bonus_rank"])],
+            "No penalty": [fmt.rank_move(a, b) for a, b in zip(around["gc_rank"], around["no_penalty_rank"])],
+            "Neither": [fmt.rank_move(a, b) for a, b in zip(around["gc_rank"], around["no_both_rank"])],
+        }), moves=["No bonus", "No penalty", "Neither"])
+        moves = queries.top10_movement(f, replay_cf)
+        moves = moves[moves["stage_no"] <= after]
+        if moves.empty:
+            ui.note(f"At no stage up to stage {after} does this replay change who is in the top 10.")
+        else:
+            grouped = moves.groupby("stage_no").apply(lambda g: pd.Series({
+                "Enters": ", ".join(g.loc[g["movement"] == "enters", "rider_name"]) or "—",
+                "Leaves": ", ".join(g.loc[g["movement"] == "leaves", "rider_name"]) or "—",
+            }), include_groups=False).reset_index().rename(columns={"stage_no": "Stage"})
+            ui.html(f'<div class="eyebrow">Stage by stage, {replay_name}</div>')
+            ui.table(grouped)
+
+# ---------- Req b + E4: parallel classifications as dots ----------
 with ui.card("parallel", "Parallel classifications", tag="Req. b · E4",
-             sub="GC top 10 plus ticked riders, ranked side by side, with a mountain-only GC proxy"):
+             sub="Each rider's rank in overall GC, the young rider GC and a mountain-only GC proxy · GC top 10, our riders and the riders on the chart above"):
     state.setdefault("w_yrule", "Age at race start")
     if not state.w_yrule:
         state.w_yrule = "Age at race start"
@@ -221,24 +212,46 @@ with ui.card("parallel", "Parallel classifications", tag="Req. b · E4",
     rule = "age" if state.w_yrule == "Age at race start" else "official"
     state.w_yrule_value = rule
     start = queries.stages()["date"].min()
-    ui.note(f"Young = age at race start ({fmt.long_date(start)}) under {f.cutoff}; change the cutoff in the filter bar." if rule == "age"
-            else "Official 2025 white-jersey rule: born on or after 1 Jan 2000.")
 
     compare = queries.compare(f, after, rule, f.cutoff)
-    c1, c2 = st.columns(2)
-    show_all_par = c1.toggle(f"Show all {len(f.narrow(compare))} riders", key="w_par_all")
-    show_derived = c2.toggle("Add Points and KOM (req. b)", key="w_par_derived")
-    rows = f.narrow(compare if show_all_par else compare[(compare["gc_rank"] <= 10) | compare["rider_bib"].isin(compare_set)])
-    columns = {"Rider": rows["rider_name"], "Age": rows["age_at_start"], "Overall GC": rows["gc_rank"]}
-    if show_derived:
-        columns["Points*"] = rows["points_rank"].map(fmt.rank_or_dash)
-        columns["KOM*"] = rows["kom_rank"].map(fmt.rank_or_dash)
-    columns["Young GC"] = rows["young_rank"].map(fmt.rank_or_dash)
-    columns["Mountain GC Proxy"] = rows["mountain_rank"].map(fmt.rank_or_dash)
-    columns["Proxy vs GC"] = rows["proxy_vs_gc"].map(fmt.signed_places)
-    view = pd.DataFrame(columns)
-    text_columns = [c for c in view.columns if c not in ("Rider", "Age", "Overall GC")]
-    ui.table(view, moves=["Proxy vs GC"], column_config={c: st.column_config.TextColumn(c, alignment="right") for c in text_columns})
-    derived_note = " *Points and KOM are derived from finishing positions, not the official scoring (see About / Method)." if show_derived else ""
-    ui.note(f"Age = age at race start ({fmt.medium_date(start)}), never today's age. Mountain GC Proxy = Σ adjusted time on the selected mountain stages, "
-            "ranked among riders who finished all of them. Proxy vs GC = Overall GC − proxy rank: + means higher on the mountains than overall, − means lower." + derived_note)
+    picked = compare[(compare["gc_rank"] <= 10) | compare["rider_bib"].isin(mine) | compare["rider_bib"].isin(chart_set)]
+    picked = f.narrow(picked).head(18)
+    if picked.empty:
+        ui.note("No ranked rider matches the current filter.")
+    else:
+        # Rider names take their team's colour when they ride for us or a rival
+        dots = pd.DataFrame({
+            "label": [f'<span style="color:{ctx.colour(t) if ctx.is_focus(t) else "#15171C"}">{g}. {escape(n)}</span>'
+                      for g, n, t in zip(picked["gc_rank"], picked["rider_name"], picked["team"])],
+            "gc": picked["gc_rank"], "young": picked["young_rank"], "mountain": picked["mountain_rank"],
+        })
+        diverge = picked.dropna(subset=["proxy_vs_gc"])
+        if not diverge.empty:
+            d = diverge.loc[diverge["proxy_vs_gc"].abs().idxmax()]
+            direction = "higher" if d.proxy_vs_gc > 0 else "lower"
+            ui.takeaway(f"Biggest gap between terrain and overall: <b>{escape(d.rider_name)}</b> ranks {abs(int(d.proxy_vs_gc))} places "
+                        f"{direction} on the mountain proxy ({fmt.ordinal(d.mountain_rank)}) than in overall GC ({fmt.ordinal(d.gc_rank)}).")
+        st.plotly_chart(charts.rank_dots(dots), width="stretch", config={"displayModeBar": False}, key="dots_chart")
+        ui.note((f"Young = age at race start ({fmt.long_date(start)}) under {f.cutoff}; change the cutoff in the filter bar. " if rule == "age"
+                 else "Official 2025 white-jersey rule: born on or after 1 Jan 2000. ")
+                + "Mountain GC proxy = Σ adjusted time on the selected mountain stages, ranked among riders who finished all of them. "
+                  "Names in our colour or a rival's colour belong to those teams.")
+
+    with st.expander("Show data: classification table, with Points and KOM"):
+        c1, c2 = st.columns(2)
+        show_all_par = c1.toggle(f"Show all {len(f.narrow(compare))} riders", key="w_par_all")
+        show_derived = c2.toggle("Add Points and KOM (req. b)", key="w_par_derived")
+        rows = f.narrow(compare if show_all_par else compare[(compare["gc_rank"] <= 10) | compare["rider_bib"].isin(chart_set)])
+        columns = {"Rider": rows["rider_name"], "Team": rows["team"], "Age": rows["age_at_start"], "Overall GC": rows["gc_rank"]}
+        if show_derived:
+            columns["Points*"] = rows["points_rank"].map(fmt.rank_or_dash)
+            columns["KOM*"] = rows["kom_rank"].map(fmt.rank_or_dash)
+        columns["Young GC"] = rows["young_rank"].map(fmt.rank_or_dash)
+        columns["Mountain GC Proxy"] = rows["mountain_rank"].map(fmt.rank_or_dash)
+        columns["Proxy vs GC"] = rows["proxy_vs_gc"].map(fmt.signed_places)
+        view = pd.DataFrame(columns)
+        text_columns = [c for c in view.columns if c not in ("Rider", "Team", "Age", "Overall GC")]
+        ui.table(view, moves=["Proxy vs GC"], column_config={c: st.column_config.TextColumn(c, alignment="right") for c in text_columns})
+        derived_note = " *Points and KOM are derived from finishing positions, not the official scoring (see About / Method)." if show_derived else ""
+        ui.note(f"Age = age at race start ({fmt.medium_date(start)}), never today's age. "
+                "Proxy vs GC = Overall GC − proxy rank: + means higher on the mountains than overall, − means lower." + derived_note)

@@ -22,7 +22,7 @@ SCENARIOS = {
     "low young cutoff": {"w_cutoff": 18},
     "replay without bonuses": {"w_cf_remove": ["Bonuses"]},
     "replay without both": {"w_cf_remove": ["Bonuses", "Penalties"]},
-    "exited riders plotted": {"w_story": [1, 106], "w_gc_exited": [106], "w_focus": 106},
+    "exited riders plotted": {"w_story": [1, 106], "w_gc_exited": [106], "w_focus": 106, "w_gc_compare": [1]},
     "gc after early stage": {"w_after": 3},
     "top-10 movement appears": {"w_from": 7},
     "all riders tables": {"w_par_all": True, "w_gc_all": True},
