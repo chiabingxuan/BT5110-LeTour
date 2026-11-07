@@ -559,7 +559,7 @@ def route_road(stages, selected_nos, winner_team, ctx, height=260):
                        font=dict(size=11), align="right")
     fig.add_annotation(x=x, y=float(np.sin(2 * np.pi * waves * x / total)), text=f"🏁 <b>FINISH</b><br>{final.end_location}", showarrow=False,
                        xanchor="left", xshift=8, font=dict(size=11), align="left")
-    fig.update_xaxes(visible=False, range=[-total * 0.075, x + total * 0.13], fixedrange=True)
+    fig.update_xaxes(visible=False, range=[-total * 0.105, x + total * 0.13], fixedrange=True)
     fig.update_yaxes(visible=False, range=[-1.75, 1.95], fixedrange=True)
     base_layout(fig, height)
     fig.update_layout(margin=dict(l=4, r=4, t=8, b=8))
