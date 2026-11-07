@@ -411,3 +411,191 @@ def itt_strip(results, itts, ctx, labelled, height=None):
     base_layout(fig, height or 140 * len(order) + 70)
     fig.update_layout(yaxis_automargin=True, margin=dict(l=8, r=12, t=30, b=40))
     return fig
+
+
+# ---------- Race-themed views: the race to the line, the route as a road, the stage podium ----------
+LANES = [0, -0.9, 0.9, -1.8, 1.8]  # across the road: the GC leader rides in the middle lane
+ROAD = 2.4
+
+
+def race_to_line(gc, stages, ctx, team_of, labelled, height=360):
+    """Animated GC: each rider is a dot on the road and the finish line is on the right.
+    Distance from the line = gap to the yellow jersey after that stage, so the race closes up or spreads out
+    as the slider moves. gc: rider_bib, rider_name, seq, gc_rank, gap (seconds); one frame per selected stage.
+    labelled: bibs whose surname is written; ctx colours dots by team role."""
+    stage_of = dict(zip(stages["seq"], stages["stage_no"]))
+    route_of = dict(zip(stages["seq"], stages["route"]))
+    seqs = sorted(gc["seq"].unique())
+
+    def trace_and_range(seq):
+        rows = gc[gc["seq"] == seq].sort_values("gc_rank")
+        teams = rows["rider_bib"].map(team_of)
+        y = [LANES[(r - 1) % len(LANES)] for r in rows["gc_rank"]]
+        # The yellow jersey (gap 0) is always named and wears a yellow ring
+        names = [n.split()[-1] if b in labelled or g == 0 else "" for b, n, g in zip(rows["rider_bib"], rows["rider_name"], rows["gap"])]
+        trace = go.Scatter(
+            ids=rows["rider_bib"].astype(str), x=rows["gap"] / 60, y=y, mode="markers+text", text=names,
+            textposition=["middle left" if g == 0 else "top center" if v >= 0 else "bottom center" for g, v in zip(rows["gap"], y)],
+            textfont=dict(size=12, color=[ctx.colour(t) if ctx.is_focus(t) else "#5B6170" for t in teams]),
+            marker=dict(size=[17 if t == ctx.my else 14 if t in ctx.rivals else 11 for t in teams],
+                        color=[ctx.colour(t) if ctx.is_focus(t) else "#9AA0AC" for t in teams],
+                        line=dict(width=[3.5 if g == 0 else 1.5 for g in rows["gap"]], color=["#F5C400" if g == 0 else "#FFFFFF" for g in rows["gap"]])),
+            hovertext=[f"<b>{n}</b> · {t}<br>GC {fmt.ordinal(k)} · {fmt.gap(g) if g else 'in yellow'}"
+                       for n, t, k, g in zip(rows["rider_name"], teams, rows["gc_rank"], rows["gap"])],
+            hoverinfo="text", cliponaxis=False,
+        )
+        reach = max(rows["gap"].max() / 60, 0.5)
+        return trace, [reach * 1.1, -reach * 0.09]
+
+    def caption(seq):
+        return [dict(xref="paper", yref="paper", x=0, y=1.08, xanchor="left", showarrow=False, align="left",
+                     text=f"<b>After stage {stage_of[seq]}</b> · {route_of[seq]}", font=dict(size=14)),
+                dict(xref="x", yref="y", x=0, y=ROAD + 0.35, yanchor="bottom", showarrow=False, text="<b>FINISH</b>",
+                     font=dict(size=11, color="#15171C"))]
+
+    frames = []
+    for seq in seqs:
+        trace, x_range = trace_and_range(seq)
+        frames.append(go.Frame(name=str(seq), data=[trace], layout=go.Layout(xaxis=dict(range=x_range), annotations=caption(seq))))
+    last = seqs[-1]
+    trace, x_range = trace_and_range(last)
+    fig = go.Figure(data=[trace], frames=frames)
+
+    # The road: asphalt, two dashed lane markings, and a chequered finish line at gap 0
+    fig.add_shape(type="rect", xref="paper", x0=0, x1=1, y0=-ROAD, y1=ROAD, fillcolor="#ECEDF0", line_width=0, layer="below")
+    for edge in (-ROAD, ROAD):
+        fig.add_shape(type="line", xref="paper", x0=0, x1=1, y0=edge, y1=edge, line=dict(color="#C9CDD4", width=2), layer="below")
+    for mark in (-1.35, 1.35):
+        fig.add_shape(type="line", xref="paper", x0=0, x1=1, y0=mark, y1=mark, line=dict(color="#FFFFFF", width=2, dash="dash"), layer="below")
+    fig.add_shape(type="line", x0=0, x1=0, y0=-ROAD, y1=ROAD, line=dict(color="#FFFFFF", width=7), layer="below")
+    fig.add_shape(type="line", x0=0, x1=0, y0=-ROAD, y1=ROAD, line=dict(color="#15171C", width=7, dash="dot"), layer="below")
+
+    steps = [dict(method="animate", label=str(stage_of[s]),
+                  args=[[str(s)], dict(mode="immediate", frame=dict(duration=0, redraw=True), transition=dict(duration=0))]) for s in seqs]
+    fig.update_layout(
+        annotations=caption(last),
+        sliders=[dict(active=len(seqs) - 1, steps=steps, x=0.09, len=0.91, y=0, yanchor="top", pad=dict(t=40),
+                      currentvalue=dict(visible=False), font=dict(size=11), tickcolor="#C9CDD4")],
+        updatemenus=[dict(type="buttons", direction="left", showactive=False, x=0, y=0, xanchor="left", yanchor="top", pad=dict(t=46, r=8),
+                          buttons=[dict(label="▶ Play", method="animate",
+                                        args=[None, dict(frame=dict(duration=900, redraw=True), transition=dict(duration=500, easing="cubic-in-out"),
+                                                         fromcurrent=False, mode="immediate")]),
+                                   dict(label="❚❚", method="animate",
+                                        args=[[None], dict(frame=dict(duration=0, redraw=False), transition=dict(duration=0), mode="immediate")])])],
+    )
+    fig.update_xaxes(range=x_range, ticksuffix="′ behind",
+                     showgrid=False, zeroline=False, fixedrange=True)
+    fig.update_yaxes(visible=False, range=[-ROAD - 0.9, ROAD + 0.9], fixedrange=True)
+    base_layout(fig, height)
+    fig.update_layout(margin=dict(l=12, r=12, t=40, b=96))
+    return fig
+
+
+def route_road(stages, selected_nos, winner_team, ctx, height=260):
+    """The 21 stages as one winding road from the first start to the final finish.
+    Each stage's length on the road is proportional to its distance and coloured by stage type; white gaps
+    separate stages, wider gaps with 'rest' mark rest days (no stage on a date). Stars above the road mark
+    stage wins by my team (named) and by rivals. stages: v_stages rows in date order."""
+    import numpy as np
+
+    total = stages["dist_km"].sum()
+    gap, rest_gap = total * 0.004, total * 0.022
+    waves = 2.0
+    fig = go.Figure()
+    x = 0.0
+    prev_date = None
+    mids, rests = [], []
+    for r in stages.itertuples():
+        if prev_date is not None and (r.date - prev_date).days > 1:
+            rests.append(x + rest_gap / 2)
+            x += rest_gap
+        prev_date = r.date
+        xs = np.linspace(x + gap, x + r.dist_km - gap, 40)
+        ys = np.sin(2 * np.pi * waves * xs / total)
+        on = r.stage_no in selected_nos
+        team = winner_team.get(r.stage_no)
+        hover = (f"<b>Stage {r.stage_no}</b> · {r.type_label} · {r.dist_km:.1f} km<br>{r.route}<br>"
+                 f"Won by {r.winner_name}{f' ({team})' if team else ''}")
+        fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", line=dict(color=TYPE_COLOURS[r.type], width=15),
+                                 opacity=1 if on else 0.25, hovertext=[hover] * len(xs), hoverinfo="text"))
+        mid = x + r.dist_km / 2
+        mids.append((r, mid, float(np.sin(2 * np.pi * waves * mid / total)), on, team, hover))
+        x += r.dist_km
+
+    # Stage numbers ride on the road; wins sit just above it
+    fig.add_trace(go.Scatter(
+        x=[m[1] for m in mids], y=[m[2] for m in mids], mode="markers+text", text=[str(m[0].stage_no) for m in mids],
+        textfont=dict(size=10, color="#15171C"), hovertext=[m[5] for m in mids], hoverinfo="text",
+        marker=dict(size=19, color="#FFFFFF", line=dict(width=2, color=[TYPE_COLOURS[m[0].type] for m in mids]),
+                    opacity=[1 if m[3] else 0.4 for m in mids]),
+    ))
+    wins = [m for m in mids if m[4] and ctx.is_focus(m[4])]
+    # One label per run of wins by the same rider on consecutive stages ("Pogacar ×2"), so labels don't collide
+    names = []
+    for i, m in enumerate(wins):
+        name = m[0].winner_name.split()[-1] if m[4] == ctx.my else ""
+        if name and i and names and wins[i - 1][4] == m[4] and wins[i - 1][0].winner_name == m[0].winner_name \
+                and m[0].stage_no - wins[i - 1][0].stage_no == 1:
+            j = len(names) - 1
+            while j > 0 and names[j] == "":
+                j -= 1
+            base, _, count = names[j].partition(" ×")
+            names[j] = f"{base} ×{int(count or 1) + 1}"
+            name = ""
+        names.append(name)
+    if wins:
+        fig.add_trace(go.Scatter(
+            x=[m[1] for m in wins], y=[m[2] + 0.62 for m in wins], mode="markers+text",
+            text=names, textposition="top center",
+            textfont=dict(size=11, color=ctx.colour(ctx.my)), hovertext=[m[5] for m in wins], hoverinfo="text", cliponaxis=False,
+            marker=dict(symbol="star", size=[17 if m[4] == ctx.my else 12 for m in wins], color=[ctx.colour(m[4]) for m in wins],
+                        line=dict(width=1, color="#FFFFFF"), opacity=[1 if m[3] else 0.4 for m in wins]),
+        ))
+    for spot in rests:
+        y = float(np.sin(2 * np.pi * waves * spot / total))
+        fig.add_annotation(x=spot, y=y - 0.55, text="rest", showarrow=False, font=dict(size=10, color="#8A90A0"))
+    first, final = stages.iloc[0], stages.iloc[-1]
+    fig.add_annotation(x=0, y=-0.05, text=f"<b>START</b><br>{first.start_location}", showarrow=False, xanchor="right", xshift=-6,
+                       font=dict(size=11), align="right")
+    fig.add_annotation(x=x, y=float(np.sin(2 * np.pi * waves * x / total)), text=f"🏁 <b>FINISH</b><br>{final.end_location}", showarrow=False,
+                       xanchor="left", xshift=8, font=dict(size=11), align="left")
+    fig.update_xaxes(visible=False, range=[-total * 0.075, x + total * 0.13], fixedrange=True)
+    fig.update_yaxes(visible=False, range=[-1.75, 1.95], fixedrange=True)
+    base_layout(fig, height)
+    fig.update_layout(margin=dict(l=4, r=4, t=8, b=8))
+    return fig
+
+
+PODIUM_X = {1: 1, 2: 0, 3: 2}
+PODIUM_H = {1: 3.0, 2: 2.2, 3: 1.6}
+
+
+def podium(rows, ctx, height=300):
+    """E2: a stage's first three on a podium, each block in the rider's team colour (grey = other teams).
+    rows: rank, rider_name, team, gap (seconds), top 3 only."""
+    fig = go.Figure()
+    for r in rows.itertuples():
+        if r.rank not in PODIUM_X:
+            continue
+        x, h = PODIUM_X[r.rank], PODIUM_H[r.rank]
+        focus = ctx.is_focus(r.team)
+        fill = ctx.colour(r.team) if focus else "#D5D8DE"
+        fig.add_shape(type="rect", x0=x - 0.42, x1=x + 0.42, y0=0, y1=h, fillcolor=fill, line=dict(color="#FFFFFF", width=2))
+        fig.add_annotation(x=x, y=h / 2, text=f"<b>{r.rank}</b>", showarrow=False,
+                           font=dict(size=34, color="#FFFFFF" if focus else "#5B6170"))
+        time = "stage winner" if r.rank == 1 else (fmt.gap(r.gap) if r.gap else "same time")
+        fig.add_annotation(x=x, y=h + 0.12, yanchor="bottom", showarrow=False, align="center",
+                           text=f"<b>{r.rider_name}</b><br><span style='font-size:11px;color:{fill if focus else '#5B6170'}'>{r.team}</span>"
+                                f"<br><span style='font-size:11px;color:#5B6170'>{time}</span>",
+                           font=dict(size=13, color="#15171C"))
+    # Invisible points so the podium has hover text
+    fig.add_trace(go.Scatter(x=[PODIUM_X[k] for k in rows["rank"] if k in PODIUM_X], y=[PODIUM_H[k] / 2 for k in rows["rank"] if k in PODIUM_X],
+                             mode="markers", marker=dict(size=40, opacity=0), hoverinfo="text",
+                             hovertext=[f"<b>{n}</b> · {t}<br>{fmt.ordinal(k)} · {fmt.gap(g) if g else 'same time'}"
+                                        for n, t, k, g in zip(rows["rider_name"], rows["team"], rows["rank"], rows["gap"]) if k in PODIUM_X]))
+    fig.add_shape(type="line", x0=-0.6, x1=2.6, y0=0, y1=0, line=dict(color="#15171C", width=2))
+    fig.update_xaxes(visible=False, range=[-0.6, 2.6], fixedrange=True)
+    fig.update_yaxes(visible=False, range=[0, 4.6], fixedrange=True)
+    base_layout(fig, height)
+    fig.update_layout(margin=dict(l=4, r=4, t=4, b=4))
+    return fig

@@ -86,16 +86,40 @@ if not bt_now.empty:
     sentence += f"; {escape(ctx.my)} {'lead' if b.team_rank == 1 else 'are ' + fmt.ordinal(b.team_rank) + ' in'} the Best Team classification"
 ui.takeaway(sentence + f", with {len(wins)} stage win{'' if len(wins) == 1 else 's'}.")
 
-# ---------- Route strip ----------
+# ---------- The route as a road ----------
 all_stages = queries.stages()
-with ui.card("route", "The route, stage by stage", "Bar height = distance · colour = stage type · faded = outside the filter · click a stage to open it"):
-    longest = all_stages["dist_km"].max()
-    heights = {row.stage_no: int(44 + row.dist_km / longest * 90) for row in all_stages.itertuples()}
-    ui.stage_button_css(all_stages, "route_", selected_only_in=set(selected["stage_no"]), heights=heights)
-    columns = st.columns(21, gap=None, vertical_alignment="bottom")
+winner_team = {int(r.stage_no): team_of.get(r.winner_bib) for r in all_stages.itertuples() if r.winner_bib in team_of.index}
+type_key = " ".join(f'<i class="dot" style="background:{ui.TYPE_COLOURS[t]}"></i>{ui.TYPE_LABELS[t]}' for t in ui.TYPE_COLOURS)
+with ui.card("route", "The road to the finish",
+             f"Length on the road = stage distance · {type_key} · ★ = stage won by us (named) or a rival · faded = outside the filter"):
+    st.plotly_chart(charts.route_road(all_stages, set(selected["stage_no"]), winner_team, ctx), width="stretch",
+                    config={"displayModeBar": False}, key="road_chart")
+    ui.note("Open a stage:")
+    ui.stage_button_css(all_stages, "route_", selected_only_in=set(selected["stage_no"]))
+    columns = st.columns(21, gap=None)
     for column, row in zip(columns, all_stages.itertuples()):
         if column.button(str(row.stage_no), key=f"route_{row.stage_no}", help=f"{row.stage_label} · {row.type_label} · {row.dist_km} km", width="stretch"):
             ui.goto("stages", w_stage=row.stage_no)
+
+# ---------- Race to the line: the GC replayed stage by stage ----------
+with ui.card("race", "Race to the line: the GC replayed stage by stage",
+             sub="Each dot is a rider; the finish line is the yellow jersey (yellow ring), so distance from it = time behind · press Play or drag the slider"):
+    all_ours = st.toggle("Show all our riders (zooms out to our whole team)", key="w_race_all")
+    leaders = final["rider_bib"].head(10).tolist()
+    ours_in = [b for b in final["rider_bib"] if b in mine]
+    rivals_best = {b for r in ctx.rivals for b in final[final["rider_bib"].map(team_of) == r]["rider_bib"].head(1)}
+    left_race = {b for b in gc_all["rider_bib"].unique() if b in mine and b not in set(final["rider_bib"])}
+    ours_shown = set(ours_in) if all_ours else set(ours_in[:1])
+    race = gc_all[gc_all["rider_bib"].isin(set(leaders) | ours_shown | rivals_best | left_race)]
+    labelled = ours_shown | left_race | rivals_best | set(leaders[:1])
+    if race.empty:
+        ui.note("No GC standings for this selection.")
+    else:
+        st.plotly_chart(charts.race_to_line(race, selected, ctx, team_of, labelled), width="stretch",
+                        config={"displayModeBar": False}, key="race_chart")
+        ui.html(f'<div>{team.swatches(ctx)}</div>')
+        ui.note("Riders shown: the GC top 10, our best rider (or all of ours), each rival's best, and any of ours who left the race, who drop off the road when they leave. "
+                "Lanes only spread the dots; position along the road is the only measure.")
 
 
 # ---------- E10 GC storyline ----------

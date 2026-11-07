@@ -141,10 +141,10 @@ The dashboard tells one story, from a team manager's point of view: pick **My te
 
 | Chapter (page) | Visuals | Requirements and narratives |
 |---|---|---|
-| 1 · Where do we stand (Overview) | Team KPI tiles with change since the previous stage, GC storyline with our riders highlighted, route strip, leaders | E10, c |
+| 1 · Where do we stand (Overview) | Team KPI tiles with change since the previous stage, the route drawn as a road with our stage wins, an animated "race to the line" GC replay, GC storyline with our riders highlighted, leaders | E10, c |
 | 2 · Our leader vs the rivals (GC) | Our leader against the rival leaders by stage with the pivotal stage, slope chart of top-10 movement, classification dot plot | E1, E7, E4, a, b, c |
 | 3 · Team strength (Teams) | Best Team gap to the leading team after every stage, top-10 heatmap of team × stage type with drill-down | c (Best team), E14, a |
-| 4 · Where we win and lose (Stages) | Mountain podiums vs mean gap scatter with rider drill-down, stage top 10 as a lollipop and squads bar, time-trial dot strip | E5, E2, E11, a |
+| 4 · Where we win and lose (Stages) | Mountain podiums vs mean gap scatter with rider drill-down, stage top 10 as a podium plus the chasing group, squads bar, time-trial dot strip | E5, E2, E11, a |
 | 5 · Scouting (Nations) | Rider map, riders and teams per country, country drill-down, young prospects outside our team | E8, d, a |
 | Rider profile, Time trials | Detail pages reached from the chapters | a |
 

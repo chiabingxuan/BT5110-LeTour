@@ -104,9 +104,15 @@ else:
                    f"best was <b>{escape(best.rider_name)}</b>, {fmt.ordinal(best['rank'])} at {fmt.gap(best.gap_to_winner) if best.gap_to_winner else 'the same time'}."))
 left, right = st.columns([3, 2])
 with left:
-    with ui.card("top10", "Top 10 finishers", tag="E2", sub="Dot = gap to the stage winner, coloured by team · grey = other teams"):
-        rows = pd.DataFrame({"label": [f"{r}. {n}" for r, n in zip(top["rank"], top["rider_name"])], "team": top["team"], "gap": top["gap_to_winner"]})
-        st.plotly_chart(charts.lollipop(rows, ctx), width="stretch", config={"displayModeBar": False}, key="top10_chart")
+    with ui.card("top10", "Top 10 finishers", tag="E2", sub="Podium and chasers coloured by team · grey = other teams · chasers' dot = gap to the stage winner"):
+        podium = pd.DataFrame({"rank": top["rank"], "rider_name": top["rider_name"], "team": top["team"], "gap": top["gap_to_winner"]}).head(3)
+        st.plotly_chart(charts.podium(podium, ctx), width="stretch", config={"displayModeBar": False}, key="podium_chart")
+        chasers = top[top["rank"] > 3]
+        if not chasers.empty:
+            ui.html('<div class="eyebrow" style="margin:4px 0 2px">The chasing group</div>')
+            rows = pd.DataFrame({"label": [f"{r}. {n}" for r, n in zip(chasers["rank"], chasers["rider_name"])],
+                                 "team": chasers["team"], "gap": chasers["gap_to_winner"]})
+            st.plotly_chart(charts.lollipop(rows, ctx), width="stretch", config={"displayModeBar": False}, key="top10_chart")
         with st.expander("Show data: top 10 table (click a row to open the rider)"):
             view = pd.DataFrame({
                 "#": top["rank"], "Rider": top["rider_name"], "Team": top["team"], "Nat.": top["rider_country"],
