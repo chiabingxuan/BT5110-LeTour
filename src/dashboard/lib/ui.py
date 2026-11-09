@@ -148,17 +148,11 @@ def goto(page, **state):
     st.switch_page(PAGES[page])
 
 
-def header(crumbs, title, schema_toggle=True):
-    """Breadcrumb + page title. crumbs is a list of labels after Overview."""
+def header(crumbs, title):
+    """Breadcrumb + page title. crumbs is a list of labels after Overview.
+    The dashboard always queries the normalised schema; the star schema (Task 4) is compared in src/benchmark.py."""
     path = " › ".join(escape(str(c)) for c in ["Overview", *crumbs])
-    left, right = st.columns([5, 2], vertical_alignment="bottom")
-    left.html(f'<div class="eyebrow">{path}</div><h1 class="page-title">{title}</h1>')
-    if schema_toggle:
-        right.segmented_control(
-            "Query schema", ["Normalized", "Star schema"], default="Normalized", disabled=True,
-            label_visibility="collapsed", key="schema_toggle",
-            help="The star schema toggle is enabled once the Task 4 star schema is built.",
-        )
+    st.html(f'<div class="eyebrow">{path}</div><h1 class="page-title">{title}</h1>')
 
 
 def card(key, title, sub=None, tag=None, drill=None):

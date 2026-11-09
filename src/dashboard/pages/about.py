@@ -4,7 +4,7 @@ import streamlit as st
 
 from lib import queries, ui
 
-ui.header(["About / Method"], "About the data and method", schema_toggle=False)
+ui.header(["About / Method"], "About the data and method")
 
 with ui.card("source", "Data source"):
     st.markdown(
