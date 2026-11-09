@@ -68,31 +68,41 @@ our_leader = next((b for b in leaders if b in mine), None)
 if state.get("w_focus") not in chart_set:
     state.w_focus = our_leader if our_leader in chart_set else chart_set[0]
 
-gc = queries.gc_by_stage(f, chart_set)
+# E7 replay: with bonuses and/or penalties removed the lines show the replayed GC, and the actual race stays as a ghost
+replaying = scenario != "actual"
+gc = queries.gc_by_stage(f, chart_set, scenario)
 gc = gc[gc["stage_no"] <= after]
+ghost = queries.gc_by_stage(f, chart_set)[lambda d: d["stage_no"] <= after] if replaying else None
 pivots = queries.pivotal(f, after)
 pivots = pivots[pivots["rider_bib"].isin(chart_set)]
 ranked = board.set_index("rider_bib")
 
 # Takeaway: our leader's place, and the closest rival leader
+# In a replay the ranks, gaps and times come from the replayed columns (rank_col, gap_col, time_col)
 if our_leader is not None:
     me = ranked.loc[our_leader]
-    where = "leads the race" if me.gc_rank == 1 else f"is {fmt.ordinal(me.gc_rank)}, {fmt.gap(me.gap)} behind the leader"
-    rival_rows = board[board["team"].isin(ctx.rivals)].sort_values("gc_rank")
+    my_rank = int(me[rank_col])
+    where = "leads the race" if my_rank == 1 else f"is {fmt.ordinal(my_rank)}, {fmt.gap(me[gap_col])} behind the leader"
+    if replaying:
+        where += f" (actual race: {fmt.ordinal(me.gc_rank)})"
+    rival_rows = board[board["team"].isin(ctx.rivals)].sort_values(rank_col)
     rival = ""
     if not rival_rows.empty:
         r = rival_rows.iloc[0]
-        diff = r.cum_time - me.cum_time
-        rival = (f"; the best rival, {escape(r.rider_name)} ({escape(r.team)}), is {fmt.ordinal(r.gc_rank)}, "
+        diff = r[time_col] - me[time_col]
+        rival = (f"; the best rival, {escape(r.rider_name)} ({escape(r.team)}), is {fmt.ordinal(int(r[rank_col]))}, "
                  f"{fmt.gap(abs(diff)).lstrip('+')} {'behind us' if diff > 0 else 'ahead of us'}")
-    ui.takeaway(f"After stage {after}, our leader <b>{escape(me.rider_name)}</b> {where}{rival}.")
+    prefix = f"Replayed {scenario_label}: after" if replaying else "After"
+    ui.takeaway(f"{prefix} stage {after}, our leader <b>{escape(me.rider_name)}</b> {where}{rival}.")
 else:
     ui.takeaway(f"After stage {after}, none of our riders is still ranked in GC.")
 
 left, right = st.columns([5, 2])
 with left:
     with ui.card("standing", "Our leader against the rival leaders", tag="E1", drill="Drill-down · stage grain",
-                 sub="Overall GC position after each stage, 1 at the top · line colour = team · ◆ = each rider's pivotal stage · shaded = mountain stages"):
+                 sub=(f"<b>Replayed {scenario_label}</b> · dashed = the actual race · ◆ = each rider's pivotal stage in the actual race · "
+                      "line colour = team · shaded = mountain stages" if replaying else
+                      "Overall GC position after each stage, 1 at the top · line colour = team · ◆ = each rider's pivotal stage · shaded = mountain stages")):
         c1, c2 = st.columns([3, 2])
         c1.multiselect("Riders on the chart (default: each team's leader and the GC leader)", list(board["rider_bib"]), key="w_gc_compare",
                        format_func=lambda b: f"{ranked.loc[b, 'gc_rank']}. {names[b]} · {team_of[b]}", max_selections=10)
@@ -108,7 +118,7 @@ with left:
         exit_stages = {b: int(all_riders.loc[b, "exit_stage"]) for b in chart_set if b in left_race}
         labels = {b: names[b].split()[-1] for b in chart_set}
         st.plotly_chart(charts.gc_lines(gc, in_range, chart_set, "rank", pivots=pivots, focus=focus, exits=exit_stages, height=360,
-                                        rank_scale=state.w_rank_scale.lower(), colours=colours, bold=mine, end_labels=labels),
+                                        rank_scale=state.w_rank_scale.lower(), colours=colours, bold=mine, end_labels=labels, ghost=ghost),
                         width="stretch", config={"displayModeBar": False}, key="standing_chart")
         ui.html(f"<div>{team.swatches(ctx)}</div>")
 with right:
@@ -130,7 +140,8 @@ with right:
                 what = "no time change"
             ui.html(f'<div class="dark-box"><span class="eyebrow">Pivotal moment</span><b style="font-size:18px">Stage {s.stage_no} · {escape(s.route)}</b>'
                     f'<span>{s.type_label} · {fmt.long_date(s.date)} · GC {int(p.prev_rank)} → {int(p.gc_rank)} · {what}</span></div>')
-        ui.note("Pivotal stage = the largest swing in the rider's gap to the GC leader; ties go to the bigger rank change, then the later stage.")
+        ui.note("Pivotal stage = the largest swing in the rider's gap to the GC leader; ties go to the bigger rank change, then the later stage."
+                + (" Shown for the actual race, not the replay." if replaying else ""))
         if st.button("Open full rider profile →", key="open_profile"):
             ui.goto("riders", w_rider=int(focus))
 

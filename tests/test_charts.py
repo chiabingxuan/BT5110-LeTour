@@ -49,3 +49,23 @@ def test_podium_puts_the_winner_on_the_middle_and_tallest_block():
     blocks = [s for s in fig.layout.shapes if s.type == "rect"]
     winner = max(blocks, key=lambda s: s.y1)
     assert (winner.x0 + winner.x1) / 2 == 1 and winner.fillcolor == MY
+
+
+def test_gc_lines_replay_keeps_the_actual_race_as_a_dashed_ghost():
+    stages = pd.DataFrame({"seq": [1, 2], "stage_no": [1, 2], "type": ["flat", "mountain"], "route": ["X → Y", "Y → Z"]})
+
+    def rows(ranks, gaps):
+        return pd.DataFrame({"rider_bib": [1, 2, 1, 2], "rider_name": ["Ann One", "Bo Two"] * 2, "seq": [1, 1, 2, 2],
+                             "stage_no": [1, 1, 2, 2], "gc_rank": ranks, "gap": gaps, "cum_time": [100, 104, 200, 210]})
+
+    actual = rows([1, 2, 1, 2], [0, 4, 0, 10])
+    replay = rows([2, 1, 1, 2], [6, 0, 0, 3])
+    pivots = pd.DataFrame({"rider_bib": [2], "stage_no": [2]})
+    fig = charts.gc_lines(replay, stages, [1, 2], "rank", pivots=pivots, ghost=actual)
+    ghosts = [t for t in fig.data if t.line and t.line.dash == "dash"]
+    assert len(ghosts) == 2 and list(ghosts[0].y) == [1, 1]
+    # The pivotal marker (an actual-race measure) sits on the actual line: rider 2 was 2nd after stage 2
+    diamond = next(t for t in fig.data if t.marker and t.marker.symbol == "diamond")
+    assert list(diamond.y) == [2]
+    # Without a replay there are no ghost lines
+    assert not [t for t in charts.gc_lines(actual, stages, [1, 2], "rank").data if t.line and t.line.dash == "dash"]

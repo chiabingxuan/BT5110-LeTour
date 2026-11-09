@@ -34,12 +34,14 @@ def _stage_axis(fig, stages):
 
 
 def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pivots=None, focus=None, exits=None, height=380,
-             rank_scale="log", colours=None, bold=(), end_labels=None):
+             rank_scale="log", colours=None, bold=(), end_labels=None, ghost=None):
     """GC storyline (E10) and GC standing (E1). measure: 'rank' or 'time' (gap to the leader).
     rank_scale: 'log' or 'linear' spacing of the rank axis.
     exits maps a bib to its exit stage, for riders who left the race: their line ends in an ×.
     colours maps a bib to its line colour (by team role); bold bibs are drawn thicker;
     end_labels maps a bib to the label written at the end of its line.
+    ghost: the actual race (same columns as gc) when gc is an E7 replay; each rider's actual line is drawn faint and
+    dashed behind the replayed one, and the pivotal markers (an actual-race measure) sit on the actual line.
     The inverted y axis puts the leader on top in both views."""
     fig = go.Figure()
 
@@ -57,6 +59,20 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
 
     positions = {}
     hover_of = {}  # (bib, stage) -> full hover text, so a marker on top of a line loses nothing
+    actual_at = {}  # bib -> {stage: y} on the actual-race ghost line
+    if ghost is not None:
+        for bib in bibs:
+            rows = ghost[ghost["rider_bib"] == bib].sort_values("seq")
+            if rows.empty:
+                continue
+            ys = [y_value(r, g) for r, g in zip(rows["gc_rank"], rows["gap"])]
+            actual_at[bib] = dict(zip(rows["stage_no"], ys))
+            hover_of.update({(bib, ("actual", stage)): f"<b>{name}</b> · actual race<br>Stage {stage}: GC {rank} · {fmt.gap(gap) if gap else 'leader'}"
+                             for name, stage, rank, gap in zip(rows["rider_name"], rows["stage_no"], rows["gc_rank"], rows["gap"])})
+            fig.add_trace(go.Scatter(
+                x=rows["seq"], y=ys, mode="lines", line=dict(color=colour_of(bib), width=1.6, dash="dash"), opacity=0.45,
+                hovertext=[hover_of[(bib, ("actual", s))] for s in rows["stage_no"]], hoverinfo="text",
+            ))
     for i, bib in reversed(list(enumerate(bibs))):
         rows = gc[gc["rider_bib"] == bib].sort_values("seq")
         if rows.empty:
@@ -64,7 +80,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
         ys = [y_value(r, g) for r, g in zip(rows["gc_rank"], rows["gap"])]
         positions[bib] = dict(zip(rows["stage_no"], ys))
         hover = [
-            f"<b>{name}</b><br>Stage {stage}: {seq_label[seq]}<br>GC {rank} · {fmt.gap(gap) if gap else 'leader'}<br>Total {fmt.hms(cum)}"
+            f"<b>{name}</b>{' · replay' if ghost is not None else ''}<br>Stage {stage}: {seq_label[seq]}<br>GC {rank} · {fmt.gap(gap) if gap else 'leader'}<br>Total {fmt.hms(cum)}"
             for name, stage, seq, rank, gap, cum in zip(
                 rows["rider_name"], rows["stage_no"], rows["seq"], rows["gc_rank"], rows["gap"], rows["cum_time"])
         ]
@@ -98,11 +114,12 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
                 ))
 
     if pivots is not None and not pivots.empty:
+        on_line, key = (actual_at, lambda b, s: (b, ("actual", s))) if ghost is not None else (positions, lambda b, s: (b, s))
         for row in pivots.itertuples():
-            if row.rider_bib in positions and row.stage_no in positions[row.rider_bib]:
+            if row.rider_bib in on_line and row.stage_no in on_line[row.rider_bib]:
                 fig.add_trace(go.Scatter(
-                    x=[stage_of[row.stage_no]], y=[positions[row.rider_bib][row.stage_no]], mode="markers",
-                    hovertext=[f"{hover_of[(row.rider_bib, row.stage_no)]}<br><b>Pivotal stage</b>"], hoverinfo="text",
+                    x=[stage_of[row.stage_no]], y=[on_line[row.rider_bib][row.stage_no]], mode="markers",
+                    hovertext=[f"{hover_of[key(row.rider_bib, row.stage_no)]}<br><b>Pivotal stage</b>"], hoverinfo="text",
                     marker=dict(symbol="diamond", size=13, color="#15171C",
                                 line=dict(width=2, color=colour_of(row.rider_bib))),
                 ))
@@ -138,7 +155,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
     if measure == "rank" and rank_scale == "log":
         # Every rank is shown. A log scale keeps the fight for the top places readable even when a
         # plotted rider sits far down the field: 1st to 10th gets about as much room as 10th to 100th.
-        lowest = max((max(v.values()) for v in positions.values()), default=10)
+        lowest = max((max(v.values()) for v in [*positions.values(), *actual_at.values()]), default=10)
         ticks = [t for t in RANK_TICKS if t <= max(lowest, 10)]
         if lowest > ticks[-1] * 1.3:
             ticks.append(int(lowest))  # label the lowest plotted rank too, e.g. 80 after 50
@@ -148,7 +165,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
                          gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
     elif measure == "rank":
         # Evenly spaced ranks, so distance on the chart is distance in the standings
-        lowest = max((max(v.values()) for v in positions.values()), default=10)
+        lowest = max((max(v.values()) for v in [*positions.values(), *actual_at.values()]), default=10)
         step = next(s for s in (1, 2, 5, 10, 20, 25, 50) if lowest / s <= 10)
         ticks = [1] + list(range(step, int(lowest) + 1, step))
         fig.update_yaxes(title="GC position", type="linear", autorange=False,
@@ -156,7 +173,7 @@ def gc_lines(gc, stages, bibs, measure="rank", inflections=None, yellow=None, pi
                          tickvals=ticks, ticktext=[str(t) for t in ticks],
                          gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
     else:
-        top = max((max(v.values()) for v in positions.values()), default=1)
+        top = max((max(v.values()) for v in [*positions.values(), *actual_at.values()]), default=1)
         fig.update_yaxes(title="Minutes behind the leader", autorange=False, range=[top * 1.05 + 0.2, -0.2 - top * 0.02],
                          ticksuffix="′", gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
     return base_layout(fig, height)
@@ -355,7 +372,9 @@ def contour_scatter(rows, ctx, labelled, height=400):
     fig.update_xaxes(range=[-0.3, max(fit * 1.35, 3)])
     fig.update_xaxes(title="Mean gap to the stage winner on mountain stages (minutes) · closer to the winners ←", ticksuffix="′",
                      rangemode="tozero", gridcolor="#EEF0F3", griddash="dash", zeroline=False, fixedrange=True)
-    fig.update_yaxes(title="Mountain podiums", dtick=1, rangemode="tozero", gridcolor="#EEF0F3", zeroline=False, fixedrange=True)
+    # Room below 0 and above the top count, so the crowded 0-podium row and its labels have space
+    fig.update_yaxes(title="Mountain podiums", dtick=1, range=[-0.75, rows["podiums"].max() + 0.6], gridcolor="#EEF0F3",
+                     zeroline=False, fixedrange=True)
     return base_layout(fig, height)
 
 

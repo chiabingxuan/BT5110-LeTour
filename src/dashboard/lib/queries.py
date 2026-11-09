@@ -41,13 +41,14 @@ def kpis(f):
     return query(f"SELECT * FROM fn_race_kpis({SEL})", **_sel(f)).iloc[0]
 
 
-def gc_by_stage(f, bibs=None):
+def gc_by_stage(f, bibs=None, cf="actual"):
+    """GC after every selected stage. cf replays it: 'actual', 'no_bonus', 'no_penalty' or 'no_both' (E7)."""
     return query(f"""
-        SELECT g.*, r.rider_name FROM fn_gc_by_stage({SEL}) g
+        SELECT g.*, r.rider_name FROM fn_gc_by_stage({SEL}, :cf) g
         JOIN v_riders r ON r.rider_bib = g.rider_bib
         WHERE CAST(:b AS int[]) IS NULL OR g.rider_bib = ANY (CAST(:b AS int[]))
         ORDER BY g.seq, g.gc_rank
-    """, b=bibs, **_sel(f))
+    """, b=bibs, cf=cf, **_sel(f))
 
 
 def gc_final(f, after=None):

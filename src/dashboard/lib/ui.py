@@ -68,6 +68,13 @@ h1.page-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; f
 /* Team pickers in the dark sidebar */
 .st-key-side_team { background: #1E2129; border: 1px solid #2C3039; border-radius: 10px; padding: 10px 12px; }
 .st-key-side_team label p { color: #FFFFFF !important; font-weight: 600; }
+/* A wider sidebar fits full team names in the rival chips; any longer name ends in an ellipsis
+   instead of pushing the sidebar wider */
+section[data-testid="stSidebar"] { width: 304px !important; min-width: 304px !important; }
+.st-key-side_team [data-testid="stMultiSelectTagsContainer"] { min-width: 0 !important; max-width: 100%; flex-wrap: wrap; }
+.st-key-side_team [data-testid="stMultiSelectTagsContainer"] > * { max-width: 100%; min-width: 0; }
+.st-key-side_team [data-testid="stMultiSelectTagsContainer"] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-testid="stSidebarContent"] { overflow-x: hidden; }
 
 /* One-line takeaway under a chart, computed from the data */
 .takeaway { border-left: 4px solid #C2185B; background: #FBEFF4; color: #15171C; padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 15px; font-weight: 600; line-height: 1.4; }
