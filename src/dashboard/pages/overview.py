@@ -33,9 +33,18 @@ def move(before, after, lower_is_better=True, unit=""):
         return ""
     change = (before - after) if lower_is_better else (after - before)
     if change == 0:
-        return f'<span class="note">= since stage {prev_no}</span>'
+        return f'<span class="note">unchanged since stage {prev_no}</span>'
     css, arrow = ("up", "▲") if change > 0 else ("down", "▼")
     return f'<span class="{css}">{arrow} {abs(change)}{unit}</span> <span class="note">since stage {prev_no}</span>'
+
+
+def yellow_since(bib):
+    """First stage of the rider's current unbroken run in yellow (GC rank 1 up to the last selected stage)."""
+    ranks = gc_all[gc_all["rider_bib"] == bib].set_index("seq")["gc_rank"]
+    seq = last_seq
+    while seq - 1 in ranks.index and ranks[seq - 1] == 1:
+        seq -= 1
+    return int(selected.loc[selected["seq"] == seq, "stage_no"].iloc[0])
 
 
 def best_of_mine(seq):
@@ -54,7 +63,7 @@ riders_now, riders_before = in_race(last_seq), (in_race(last_seq - 1) if last_se
 
 tiles = []
 if now is not None:
-    lead = "in yellow" if now.gc_rank == 1 else f"{fmt.gap(now.gap)} to yellow"
+    lead = f"in yellow since stage {yellow_since(now.rider_bib)}" if now.gc_rank == 1 else f"{fmt.gap(now.gap)} to yellow"
     tiles.append(("Best GC rider", fmt.ordinal(now.gc_rank),
                   f"{escape(now.rider_name)} · {lead}<br>{move(None if before is None else int(before.gc_rank), int(now.gc_rank), unit=' place(s)')}"))
 else:
