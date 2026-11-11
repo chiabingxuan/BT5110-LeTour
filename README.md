@@ -135,6 +135,33 @@ playwright install chromium
 python src/screenshots.py
 ```
 
+## Deploying online (Streamlit Community Cloud + Neon)
+The app needs a Python server and a PostgreSQL database, so it cannot run on GitHub Pages. Both services below are free; the race data never goes into git.
+
+1. **Database (Neon).** Create a free project at neon.tech and copy its connection details (host, database, user, password).
+2. **Load the data into it from your laptop.** Point a copy of `.env` at Neon and run the usual build:
+   ```
+   DB_HOST=<your-project>.neon.tech
+   DB_PORT=5432
+   DB_NAME=neondb
+   DB_USER=<user>
+   DB_PASSWORD=<password>
+   DB_SSLMODE=require
+   ```
+   then `python src/init_db.py`. It reads `data/` locally and writes the tables, views and star schema to Neon. Switch `.env` back to the local database afterwards.
+3. **App (Streamlit Community Cloud).** At share.streamlit.io sign in with GitHub, choose **Create app**, then repository `chiabingxuan/BT5110-LeTour`, branch `main`, main file `src/dashboard/app.py`. Under **Advanced settings**, pick Python 3.12 and paste the same six settings as secrets (TOML, values in quotes):
+   ```
+   DB_HOST = "<your-project>.neon.tech"
+   DB_PORT = "5432"
+   DB_NAME = "neondb"
+   DB_USER = "<user>"
+   DB_PASSWORD = "<password>"
+   DB_SSLMODE = "require"
+   ```
+4. **Deploy.** The app reads `.env` locally and Streamlit secrets online (`src/dashboard/lib/db.py`), and rebuilds the analytics views on its first start if the SQL changed. Every push to `main` redeploys it.
+
+Never commit `.env` or `.streamlit/secrets.toml` (both are git-ignored).
+
 ## Where each requirement lives
 
 The dashboard tells one story, from a team manager's point of view: pick **My team** (default UAE Team Emirates XRG) and its **Rivals** (default: the three best other teams in Best Team) in the sidebar, and every chart colours them (ours in a bold accent, rivals in teal, the rest grey). Each section opens with a chart and a one-line takeaway computed from the data; tables sit behind **Show data** or in drill-downs.

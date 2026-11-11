@@ -15,15 +15,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import init_db  # noqa: E402
 
 
+def setting(key, default=None):
+    """A connection setting: from .env when running locally, else from Streamlit secrets (Streamlit Community Cloud)."""
+    if key in os.environ:
+        return os.environ[key]
+    try:
+        return st.secrets[key]
+    except Exception:  # no secrets file, or the key is not in it
+        if default is not None:
+            return default
+        raise KeyError(f"{key} is not set: add it to .env (local) or to the app's secrets (Streamlit Cloud)")
+
+
 @st.cache_resource
 def engine():
+    # A hosted database such as Neon needs DB_SSLMODE=require; locally it is usually left unset
+    sslmode = setting("DB_SSLMODE", "")
     return create_engine(URL.create(
         "postgresql+psycopg2",
-        host=os.environ["DB_HOST"],
-        port=int(os.environ["DB_PORT"]),
-        database=os.environ["DB_NAME"],
-        username=os.environ["DB_USER"],
-        password=os.environ["DB_PASSWORD"],
+        host=setting("DB_HOST"),
+        port=int(setting("DB_PORT", "5432")),
+        database=setting("DB_NAME"),
+        username=setting("DB_USER"),
+        password=setting("DB_PASSWORD"),
+        query={"sslmode": sslmode} if sslmode else {},
     ))
 
 

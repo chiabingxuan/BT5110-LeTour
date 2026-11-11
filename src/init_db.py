@@ -19,17 +19,26 @@ SQL_DIR = ROOT / "src" / "sql"
 
 
 def db_config(dbname=None):
-    return {
+    config = {
         "host": os.environ["DB_HOST"],
         "port": os.environ["DB_PORT"],
         "user": os.environ["DB_USER"],
         "password": os.environ["DB_PASSWORD"],
         "dbname": dbname or os.environ["DB_NAME"],
     }
+    # A hosted database such as Neon needs DB_SSLMODE=require; locally it is usually left unset
+    if os.environ.get("DB_SSLMODE"):
+        config["sslmode"] = os.environ["DB_SSLMODE"]
+    return config
 
 
 def create_database_if_missing():
     name = os.environ["DB_NAME"]
+    try:  # the database already exists (always the case on a hosted database), so there is nothing to create
+        psycopg2.connect(**db_config()).close()
+        return
+    except psycopg2.OperationalError:
+        pass
     connection = psycopg2.connect(**db_config("postgres"))
     connection.autocommit = True
     with connection.cursor() as cursor:
