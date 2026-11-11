@@ -2,10 +2,12 @@
 
     python src/init_db.py               full rebuild (deletes and reloads everything)
     python src/init_db.py --views-only  recreate only the analytics views and functions, and reload the star schema
+    python src/init_db.py --neon        the same full rebuild, but on the Neon database in DATABASE_URL (.env)
 """
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
 
 import psycopg2
@@ -18,7 +20,15 @@ ROOT = Path(__file__).resolve().parent.parent
 SQL_DIR = ROOT / "src" / "sql"
 
 
+# Set by --neon: the hosted database's connection string, used instead of the DB_* settings
+TARGET_URL = None
+
+
 def db_config(dbname=None):
+    if TARGET_URL and dbname is None:
+        # Neon's URL has no port; without one libpq would fall back to a PGPORT set for a local database
+        has_port = re.search(r"@[^/?]+:\d+", TARGET_URL)
+        return {"dsn": TARGET_URL} if has_port else {"dsn": TARGET_URL, "port": 5432}
     config = {
         "host": os.environ["DB_HOST"],
         "port": os.environ["DB_PORT"],
@@ -109,9 +119,14 @@ def refresh_views_if_stale(cursor):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--views-only", action="store_true", help="keep the data and recreate only the views")
+    parser.add_argument("--neon", action="store_true", help="build the Neon database in DATABASE_URL instead of the local one")
     args = parser.parse_args()
 
     load_dotenv(ROOT / ".env")
+    if args.neon:
+        global TARGET_URL
+        # The unpooled URL connects straight to Postgres, which suits one long rebuild transaction
+        TARGET_URL = os.environ.get("DATABASE_URL_UNPOOLED") or os.environ["DATABASE_URL"]
     create_database_if_missing()
 
     # A single transaction, so a failed rebuild leaves the previous database intact

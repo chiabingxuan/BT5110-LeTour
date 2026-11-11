@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
-from sqlalchemy import URL, create_engine, text
+from sqlalchemy import URL, create_engine, make_url, text
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
@@ -27,11 +27,27 @@ def setting(key, default=None):
         raise KeyError(f"{key} is not set: add it to .env (local) or to the app's secrets (Streamlit Cloud)")
 
 
-@st.cache_resource
-def engine():
-    # A hosted database such as Neon needs DB_SSLMODE=require; locally it is usually left unset
+def has_setting(key):
+    try:
+        setting(key)
+        return True
+    except KeyError:
+        return False
+
+
+def connection_url():
+    """The local database from the DB_* settings, or a hosted one (Neon) from DATABASE_URL.
+
+    DB_* wins when both are set, so a laptop whose .env also holds Neon's DATABASE_URL keeps using
+    the local database. Online, the app's secrets hold only DATABASE_URL.
+    """
+    if not has_setting("DB_HOST") and has_setting("DATABASE_URL"):
+        url = make_url(setting("DATABASE_URL")).set(drivername="postgresql+psycopg2")
+        # Neon's URL has no port; without one libpq would fall back to a PGPORT set for a local database
+        return url if url.port else url.set(port=5432)
+    # A hosted database reached through DB_* settings needs DB_SSLMODE=require; locally it is usually left unset
     sslmode = setting("DB_SSLMODE", "")
-    return create_engine(URL.create(
+    return URL.create(
         "postgresql+psycopg2",
         host=setting("DB_HOST"),
         port=int(setting("DB_PORT", "5432")),
@@ -39,7 +55,12 @@ def engine():
         username=setting("DB_USER"),
         password=setting("DB_PASSWORD"),
         query={"sslmode": sslmode} if sslmode else {},
-    ))
+    )
+
+
+@st.cache_resource
+def engine():
+    return create_engine(connection_url(), pool_pre_ping=True)
 
 
 @st.cache_resource(show_spinner="Updating the database views to match this version of the code…")
